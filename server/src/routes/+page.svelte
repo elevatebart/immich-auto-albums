@@ -315,7 +315,12 @@
 
 			{#if shown}
 				<div class:opacity-60={recomputing}>
-					<AlbumsPanel preview={shown} {selected} {canApply} />
+					<AlbumsPanel
+						preview={shown}
+						{selected}
+						{canApply}
+						draftConfig={shown.draft ? payload() : undefined}
+					/>
 				</div>
 			{:else if scanning}
 				<Text color="muted">

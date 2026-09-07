@@ -1,7 +1,9 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
 	import { Badge, Card, CardBody, Checkbox, HStack, Select, Stack, Text } from '@immich/ui';
+	import AlbumModal from '$lib/components/AlbumModal.svelte';
 	import CentroidsMap from '$lib/components/CentroidsMap.svelte';
+	import Thumb from '$lib/components/Thumb.svelte';
 	import type { Preview, PreviewRow } from '$lib/types';
 
 	interface Props {
@@ -9,9 +11,25 @@
 		/** Row ids to write on apply. Empty for a draft, which cannot be applied. */
 		selected: SvelteSet<string>;
 		canApply: boolean;
+		/** Passed to the modal so it opens the same plan the list is showing. */
+		draftConfig?: unknown;
 	}
 
-	let { preview, selected, canApply }: Props = $props();
+	let { preview, selected, canApply, draftConfig }: Props = $props();
+
+	let opened = $state<PreviewRow | null>(null);
+	let thumbHint = $state<string | null>(null);
+	let probed = false;
+
+	/** A 403 on a thumbnail means the key lacks asset.view, which is worth saying out loud. */
+	$effect(() => {
+		const id = preview.rows.find((r) => r.sample.length)?.sample[0];
+		if (!id || probed) return;
+		probed = true;
+		fetch(`/api/assets/${id}/thumbnail`).then((res) => {
+			if (res.status === 403) thumbHint = 'Add asset.view to the API key to see the photos.';
+		});
+	});
 
 	let hideNoop = $state(true);
 	let kind = $state('all');
@@ -61,6 +79,7 @@
 					{preview.stats.create} to create, {preview.stats.update} to update, {preview.stats.noop}
 					unchanged
 				</Text>
+				{#if thumbHint}<Text color="warning" size="small">{thumbHint}</Text>{/if}
 			</HStack>
 
 			<table class="w-full text-sm">
@@ -95,7 +114,23 @@
 								<Text color="muted" size="tiny">{r.kind}</Text>
 							</td>
 							<td class="py-2 pe-2">
-								{r.userRenamed ? r.albumName : r.name}
+								<button
+									type="button"
+									onclick={(e) => (e.stopPropagation(), (opened = r))}
+									class="hover:text-primary text-start underline-offset-2 hover:underline"
+								>
+									{r.userRenamed ? r.albumName : r.name}
+								</button>
+								{#if r.sample.length}
+									<HStack gap={1} class="pt-1">
+										{#each r.sample as id (id)}
+											<Thumb {id} />
+										{/each}
+										{#if r.assets > r.sample.length}
+											<Text color="muted" size="tiny">+{r.assets - r.sample.length}</Text>
+										{/if}
+									</HStack>
+								{/if}
 								<HStack gap={1} class="flex-wrap pt-0.5">
 									<Badge color={opColor(r.op)} size="small">{r.op}</Badge>
 									{#if r.rename}<Badge color="info" size="small">rename</Badge>{/if}
@@ -124,3 +159,7 @@
 		</Stack>
 	</CardBody>
 </Card>
+
+{#if opened}
+	<AlbumModal row={opened} {draftConfig} onClose={() => (opened = null)} />
+{/if}

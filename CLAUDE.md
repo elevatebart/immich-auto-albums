@@ -17,7 +17,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `server/`: SvelteKit UI, `@immich/ui` components on Tailwind 4 so it matches Immich. Imports `src/` through the
   `$core` alias (`server/vite.config.ts`). `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire
   types. Routes: `GET`/`POST /api/preview` (saved config, draft config), `POST /api/apply`, `GET`/`PUT /api/config`,
-  `GET /api/people`, `GET /api/people/<id>/thumbnail`, `GET /api/geocode`. One page, `/`: handles left, albums right. A draft preview carries no token, so only a plan from
+  `GET /api/people`, `GET /api/people/<id>/thumbnail`, `GET /api/assets/<id>/thumbnail`, `POST /api/albums/assets`,
+  `GET /api/geocode`. One page, `/`: handles left, albums right. A draft preview carries no token, so only a plan from
   the saved config can be applied. Apply needs the preview token plus `confirm: true`, and
   `apply.ts` is the only path that mutates Immich. Config writes need the file etag, are validated field by field in
   `config-io.ts`, keep a `.bak` and swap through a temp file. `DEMO=1` swaps in a fixture library, apply then dry runs.
@@ -42,7 +43,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - The API key comes from `IMMICH_API_KEY` only. Never write it to config or logs.
 - Immich API facts verified against the OpenAPI spec: `POST /search/metadata` (page/size/withExif/visibility/personIds/takenAfter as full ISO datetime),
   `GET /people?withHidden=false&page&size`, `GET /people/{id}/thumbnail` (octet-stream),
-  `GET /search/places?name=` (`{name, latitude, longitude, admin1name, admin2name}`), `GET/POST/PATCH /albums`,
+  `GET /search/places?name=` (`{name, latitude, longitude, admin1name, admin2name}`),
+  `GET /assets/{id}/thumbnail?size=thumbnail|preview` (needs `asset.view`), `GET/POST/PATCH /albums`,
   `PUT/DELETE /albums/{id}/assets`. Permissions needed:
   asset.read, person.read, album.read, album.create, album.update, albumAsset.create, albumAsset.delete, user.read.
 

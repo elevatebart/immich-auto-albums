@@ -20,6 +20,8 @@ export interface PreviewRow {
 	albumId?: string;
 	albumName?: string;
 	centroid?: { lat: number; lon: number };
+	/** First few asset ids, for the thumbnails in the list. */
+	sample: string[];
 }
 
 export interface PreviewStats {
@@ -110,4 +112,14 @@ export interface GeoHit {
 	lon: number;
 	/** "immich" is its own geodata, "nominatim" means the query left the network. */
 	source: 'immich' | 'nominatim';
+}
+
+export interface AlbumAssets {
+	id: string;
+	name: string;
+	/** Asset ids the album will hold, capped; `total` is the real count. */
+	ids: string[];
+	total: number;
+	add: string[];
+	remove: string[];
 }

@@ -102,7 +102,9 @@ const rowOf = (a: Action): PreviewRow => ({
 	userRenamed: a.op === 'update' && a.userRenamed,
 	albumId: a.op === 'create' ? undefined : a.album.id,
 	albumName: a.op === 'create' ? undefined : a.album.name,
-	centroid: a.plan.centroid
+	centroid: a.plan.centroid,
+	// Enough for the strip in the list. The modal asks for the rest.
+	sample: a.plan.ids.slice(0, 4)
 });
 
 /** Digest of what apply would do, so a stale confirm can be rejected. */

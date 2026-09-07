@@ -28,6 +28,10 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
 - `GET /api/people` -> `PeopleResponse`: named people from Immich, for the household and "me" pickers.
 - `GET /api/people/<id>/thumbnail`: proxies Immich's person thumbnail so the key stays server side. The id must be
   a UUID, anything else is 404, and the picker falls back to initials whenever the image does not load.
+- `GET /api/assets/<id>/thumbnail?size=thumbnail|preview`: same idea for photos. Needs `asset.view` on the key, and
+  a 403 turns into a hint in the album list rather than a wall of grey boxes.
+- `POST /api/albums/assets` with `{ id, config? }` -> `AlbumAssets`: the asset ids of one planned album, capped at
+  300, plus the ones joining and leaving. Pass the draft config to open the album the list is currently showing.
 - `GET /api/geocode?q=` -> `{ hits: GeoHit[] }`: address to coordinates for the homes. Immich's own geodata first
   (`GET /search/places`, place level, nothing leaves the network), and only when that finds nothing, Nominatim for
   street level, which does send the query out. `GEOCODER=immich` turns that fallback off.
@@ -44,7 +48,8 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   native date inputs for the quiet period and the fixed events, row editors for aliases, events and overrides, and
   the rendered TOML. Check file renders it through the dry run; Save
   writes it.
-  Right (`AlbumsPanel.svelte`): the planned albums with create, update, rename, kept-name and unchanged badges, a
+  Right (`AlbumsPanel.svelte`): the planned albums with create, update, rename, kept-name and unchanged badges, four
+  thumbnails per row, the album name opening a full grid in a modal with the joining and leaving photos ringed, a
   kind filter, an unchanged-rows toggle, and a Leaflet map of the cluster centroids sized by photo count and coloured
   like the badges. Clicking a circle highlights its row, clicking a row pans to its circle.
   Move any handle and the right panel replans 400 ms later from the draft, without saving. Apply stays disabled until
