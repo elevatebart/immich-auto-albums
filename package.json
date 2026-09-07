@@ -8,7 +8,8 @@
     "test": "vitest run",
     "preview": "node dist/cli.js preview",
     "apply": "node dist/cli.js apply",
-    "ui": "npm --prefix server run dev"
+    "ui": "npm --prefix server run dev",
+    "schema": "node scripts/write-schema.ts"
   },
   "keywords": [],
   "author": "",
@@ -20,6 +21,8 @@
   },
   "type": "module",
   "dependencies": {
+    "ajv": "^8.20.0",
+    "ajv-formats": "^3.0.1",
     "smol-toml": "^1.8.0"
   }
 }

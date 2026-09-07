@@ -1,18 +1,21 @@
 <script lang="ts">
 	import { Label, NumberInput, Text } from '@immich/ui';
+	import { schemaField, type ConfigIssue } from '$core/schema.js';
 
 	interface Props {
 		label: string;
+		/** Dotted path into Config. The range, the hint and the issue all key off it. */
+		field: string;
 		value: number;
-		min: number;
-		max: number;
 		step?: number;
 		unit?: string;
-		hint?: string;
-		issue?: string;
+		issues?: ConfigIssue[];
 	}
 
-	let { label, value = $bindable(), min, max, step = 1, unit, hint, issue }: Props = $props();
+	let { label, field, value = $bindable(), step = 1, unit, issues = [] }: Props = $props();
+
+	const meta = $derived(schemaField(field));
+	const issue = $derived(issues.find((i) => i.field === field)?.message);
 	const id = $props.id();
 </script>
 
@@ -21,17 +24,25 @@
 	<input
 		{id}
 		type="range"
-		{min}
-		{max}
+		min={meta.minimum}
+		max={meta.maximum}
 		{step}
 		bind:value
 		class="accent-primary h-6 w-full"
 		aria-label={label}
 	/>
-	<NumberInput bind:value size="small" {min} {max} {step} trailingText={unit} aria-label={label} />
-	{#if hint || issue}
+	<NumberInput
+		bind:value
+		size="small"
+		min={meta.minimum}
+		max={meta.maximum}
+		{step}
+		trailingText={unit}
+		aria-label={label}
+	/>
+	{#if issue || meta.description}
 		<div class="sm:col-start-2 sm:col-end-4">
-			<Text size="tiny" color={issue ? 'danger' : 'muted'}>{issue ?? hint}</Text>
+			<Text size="tiny" color={issue ? 'danger' : 'muted'}>{issue ?? meta.description}</Text>
 		</div>
 	{/if}
 </div>

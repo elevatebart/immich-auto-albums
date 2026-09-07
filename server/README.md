@@ -23,7 +23,7 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
 - `GET /api/config` -> `ConfigResponse`: the parsed `Config`, the file text and an etag.
 - `PUT /api/config` -> `ConfigWriteResponse`. Body: `{ etag, config, dryRun? }`. Replaces the file wholesale, so it
   takes the etag from GET and answers 409 when the file moved underneath. Every field is validated and all problems
-  come back at once as `issues[{field, message}]` with 400. `dryRun` renders the TOML and the warnings without
+  come back at once as `issues[{field, message}]` with 400, from the shared `validateConfig` in `src/validate.ts`. `dryRun` renders the TOML and the warnings without
   writing. A write copies the old file to `config.toml.bak`, writes through a temp file in the same directory, then
   renames, and drops the preview cache. `warnings` covers legal but costly edits, such as a new marker orphaning
   the albums tagged with the old one.
@@ -47,6 +47,10 @@ otherwise lands on zoom 0, and only refit when the data changes, so a pan or a c
 
 Config values are camelCase on the wire and snake_case in the file; `toToml` owns that mapping and regenerates the
 explanatory comments from a template, so a UI write leaves the file as readable as a hand-edited one.
+
+Slider ranges and field hints are read from the JSON Schema through `schemaField`, so nothing about a bound is written
+twice. `src/schema.ts` deliberately has no Ajv import, which keeps the validator out of the browser bundle; the server
+imports `validateConfig` from `src/validate.ts` instead.
 
 Not here yet: the config form itself, the people picker, the Leaflet map.
 

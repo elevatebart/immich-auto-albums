@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { fromToml, toToml } from '$core/config.js';
-import { parseConfig, readConfigFile, warningsFor, writeConfigFile } from '$lib/server/config-io';
+import { readConfigFile, validateConfig, warningsFor, writeConfigFile } from '$lib/server/config-io';
 import { PreviewError } from '$lib/server/preview';
 import type { ConfigWriteRequest } from '$lib/types';
 import type { RequestHandler } from './$types';
@@ -23,7 +23,7 @@ export const PUT: RequestHandler = async ({ request }) => {
 	if (typeof body?.etag !== 'string' || !body.etag) {
 		return json({ error: 'etag is required; get it from GET /api/config' }, { status: 400 });
 	}
-	const { config, issues } = parseConfig(body.config);
+	const { config, issues } = validateConfig(body.config);
 	if (issues.length) {
 		return json({ error: `${issues.length} invalid field(s)`, issues }, { status: 400 });
 	}

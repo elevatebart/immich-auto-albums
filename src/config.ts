@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import { parse } from "smol-toml";
+import { validateConfig } from "./validate.js";
 import type { Config, PlanKind } from "./types.js";
 
 type Raw = Record<string, any>;
@@ -10,14 +11,11 @@ const day = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0
 export function fromToml(text: string): Config {
   const c = parse(text) as Raw;
   const im = c.immich ?? {};
-  const pe = c.people;
-  const cl = c.clustering;
-  const py = c.person_years;
-  const se = c.seasons;
-  if (!pe || !cl || !py || !se || !c.homes?.length) {
-    throw new Error("config: sections people, homes, clustering, person_years and seasons are required");
-  }
-  return {
+  const pe = c.people ?? {};
+  const cl = c.clustering ?? {};
+  const py = c.person_years ?? {};
+  const se = c.seasons ?? {};
+  const raw = {
     immich: {
       url: im.url ?? "http://localhost:2283",
       outDir: im.out_dir ?? ".",
@@ -34,7 +32,7 @@ export function fromToml(text: string): Config {
       noPeopleTo: pe.no_people_to ? day(pe.no_people_to) : undefined,
       noPeoplePlaces: pe.no_people_places ?? [],
     },
-    homes: (c.homes as Raw[]).map((h) => ({ from: day(h.from), lat: h.lat, lon: h.lon, label: h.label })),
+    homes: ((c.homes ?? []) as Raw[]).map((h) => ({ from: day(h.from), lat: h.lat, lon: h.lon, label: h.label })),
     clustering: {
       homeKm: cl.home_km,
       placeKm: cl.place_km,
@@ -49,11 +47,16 @@ export function fromToml(text: string): Config {
       gatherMinGuests: cl.gather_min_guests,
     },
     personYears: { minPhotos: py.min_photos, householdMinPhotos: py.household_min_photos },
-    seasons: { noGpsEraEnd: day(se.no_gps_era_end), minPhotos: se.min_photos ?? 5 },
+    seasons: { noGpsEraEnd: se.no_gps_era_end === undefined ? undefined : day(se.no_gps_era_end), minPhotos: se.min_photos ?? 5 },
     aliases: { ...(c.aliases ?? {}) },
     events: ((c.events ?? []) as Raw[]).map((e) => ({ name: e.name, from: day(e.from), to: day(e.to) })),
     overrides: ((c.overrides ?? []) as Raw[]).map((o) => ({ kind: o.kind as PlanKind, keyPrefix: o.key_prefix, name: o.name })),
   };
+  const { config, issues } = validateConfig(raw);
+  if (issues.length) {
+    throw new Error(`config: ${issues.map((i) => `${i.field} ${i.message}`).join("; ")}`);
+  }
+  return config;
 }
 
 export async function loadConfig(path: string): Promise<Config> {

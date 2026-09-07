@@ -6,8 +6,12 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 ## Layout
 - `src/planner.ts`: pure, no I/O. `plan(cfg, assets, opts) -> { plans, absorbed }`. Every rule is a `planX(ctx, assets)` function.
 - `src/reconcile.ts`: pure. `reconcile(plans, managedAlbums) -> Action[]` (create | update | noop). Handles user renames.
-- `src/config.ts`: `config.toml` -> `Config` (`fromToml`) and back (`toToml`, canonical, comments from a fixed
-  template). TOML keys are snake_case, `Config` is camelCase.
+- `src/config.ts`: `config.toml` -> `Config` (`fromToml`, which validates) and back (`toToml`, canonical, comments
+  from a fixed template). TOML keys are snake_case, `Config` is camelCase.
+- `src/schema.ts`: JSON Schema 2020-12 for `Config`, plus `schemaField(path)`. No validator import, so a form can
+  pull ranges and descriptions without Ajv. `config.schema.json` is generated from it by `npm run schema`.
+- `src/validate.ts`: `validateConfig(raw) -> { config, issues }` on Ajv. Fills defaults, collects every problem, and
+  adds the order rules JSON Schema cannot express (homes chronological, event `to` after `from`).
 - `src/immich.ts`: fetch client for the Immich REST API (`x-api-key` header, `/api` prefix).
 - `src/cli.ts`: `preview` and `apply`. Writes `run_*.log`, `decisions_*.csv`, `plan_*.json` to `out_dir`.
 - `server/`: SvelteKit UI, `@immich/ui` components on Tailwind 4 so it matches Immich. Imports `src/` through the
@@ -21,6 +25,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 ## Invariants
 - Planner and reconcile stay pure so a Svelte UI and, later, an Immich WASM plugin can wrap them.
 - `Asset.t` encodes Immich `localDateTime` as a UTC-labelled Date; use `getUTC*` accessors only. Never introduce a tz library.
+- One source of truth for config bounds: the schema. Ranges, hints and defaults come from it, never hardcoded in a
+  form or a second validator.
 - Only albums whose description starts with the marker are ever touched. Description line 2 is `auto: <generated name>`;
   when album name != auto name the user renamed it and the name is preserved.
 - Event kinds (trip, daytrip, gathering) match existing albums by >=50% asset overlap within 45 days; person, season, event match by key.
@@ -38,7 +44,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 1. Done. `server/` holds the API key, exposes preview, apply, config and people. The UI has the clustering sliders, the
    people picker, the Leaflet homes map, event date pickers, the preview table with badges and the centroid map, which
    is cross-linked with the table through a focused row id.
-2. JSON Schema for `Config`, shared by the form and by a future Immich plugin settings form.
+2. Done. `src/schema.ts` holds the schema, `config.schema.json` is the generated artifact for outside consumers, and
+   the form takes every slider range and hint from it.
 3. Docker image for the NAS (`node:22-slim`), monthly run via DSM Task Scheduler as root.
 
 ## Running

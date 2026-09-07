@@ -29,12 +29,12 @@
 		Switch,
 		Text
 	} from '@immich/ui';
-	import type { Config, PlanKind } from '$core/types.js';
+	import { PLAN_KINDS, schemaField, type ConfigIssue } from '$core/schema.js';
+	import type { Config } from '$core/types.js';
 	import HomesMap from '$lib/components/HomesMap.svelte';
 	import Slider from '$lib/components/Slider.svelte';
 	import type { ConfigResponse, ConfigWriteResponse, PeopleResponse, Person } from '$lib/types';
 
-	const KINDS: PlanKind[] = ['trip', 'daytrip', 'gathering', 'person', 'season', 'event'];
 	const today = () => new Date().toISOString().slice(0, 10);
 
 	let config = $state<Config | null>(null);
@@ -45,7 +45,7 @@
 	let people = $state<Person[]>([]);
 	let peopleNote = $state('');
 
-	let issues = $state<{ field: string; message: string }[]>([]);
+	let issues = $state<ConfigIssue[]>([]);
 	let warnings = $state<string[]>([]);
 	let toml = $state('');
 	let showToml = $state(false);
@@ -65,6 +65,7 @@
 
 	const dirty = $derived(!!config && JSON.stringify(payload()) !== pristine);
 	const iss = (field: string) => issues.find((i) => i.field === field)?.message;
+	const hint = (field: string) => schemaField(field).description;
 	const peopleOptions = $derived(
 		[...new Set([...people.map((p) => p.name), ...(config?.people.household ?? []), config?.people.me ?? ''])]
 			.filter(Boolean)
@@ -228,24 +229,22 @@
 						<Input bind:value={config.immich.url} placeholder="http://nas:2283" />
 						{#if iss('immich.url')}<HelperText color="danger">{iss('immich.url')}</HelperText>{/if}
 					</Field>
-					<Field label="Output directory" description="Where the CLI writes logs and decision CSVs.">
+					<Field label="Output directory" description={hint('immich.outDir')}>
 						<Input bind:value={config.immich.outDir} />
 					</Field>
 					<Field
 						label="Album marker"
-						description="Description prefix. Only albums carrying it are ever touched, so changing it orphans the existing ones."
+						description={hint('immich.marker')}
 						invalid={!!iss('immich.marker')}
 					>
 						<Input bind:value={config.immich.marker} />
 					</Field>
 					<Slider
 						label="Recompute window"
+						field="immich.windowDays"
 						bind:value={config.immich.windowDays}
-						min={1}
-						max={3650}
 						unit="days"
-						hint="Trips and gatherings are planned inside this rolling window."
-						issue={iss('immich.windowDays')}
+						{issues}
 					/>
 				</Stack>
 			</CardBody>
@@ -263,33 +262,28 @@
 					</Field>
 					<Field
 						label="Household"
-						description="Never named in an album title, and they get a person-year album on a lower photo count."
+						description={hint('people.household')}
 					>
 						<MultiSelect bind:values={config.people.household} options={peopleOptions} />
 					</Field>
 					<Slider
 						label="Guest share of tagged photos"
+						field="people.withShare"
 						bind:value={config.people.withShare}
-						min={0}
-						max={1}
 						step={0.05}
-						hint='A guest is named in "with ..." after appearing in this share of a trip.'
-						issue={iss('people.withShare')}
+						{issues}
 					/>
 					<Slider
 						label="Minimum tagged photos"
+						field="people.withMinTagged"
 						bind:value={config.people.withMinTagged}
-						min={0}
-						max={100}
-						hint="Below this, nobody is named."
-						issue={iss('people.withMinTagged')}
+						{issues}
 					/>
 					<Slider
 						label="Maximum names in a title"
+						field="people.maxNamed"
 						bind:value={config.people.maxNamed}
-						min={1}
-						max={10}
-						issue={iss('people.maxNamed')}
+						{issues}
 					/>
 					<div>
 						<HStack gap={2} class="pb-2">
@@ -316,9 +310,7 @@
 					</div>
 					<div>
 						<Label label="Places that never get names" size="small" />
-						<Text color="muted" size="small" class="mb-2">
-							Trips to these places never get a "with ..." suffix.
-						</Text>
+						<Text color="muted" size="small" class="mb-2">{hint('people.noPeoplePlaces')}</Text>
 						<Stack gap={1}>
 							{#each config.people.noPeoplePlaces as _, i (i)}
 								<HStack gap={2}>
@@ -428,96 +420,79 @@
 				<Stack gap={2}>
 					<Slider
 						label="Home radius"
+						field="clustering.homeKm"
 						bind:value={config.clustering.homeKm}
-						min={0.5}
-						max={100}
 						step={0.5}
 						unit="km"
-						hint="Photos inside it are at home."
-						issue={iss('clustering.homeKm')}
+						{issues}
 					/>
 					<Slider
 						label="Place radius"
+						field="clustering.placeKm"
 						bind:value={config.clustering.placeKm}
-						min={0.5}
-						max={100}
 						step={0.5}
 						unit="km"
-						hint="Groups photos around a running centroid before naming a place."
-						issue={iss('clustering.placeKm')}
+						{issues}
 					/>
 					<Slider
 						label="Label merge radius"
+						field="clustering.mergeLabelKm"
 						bind:value={config.clustering.mergeLabelKm}
-						min={0.5}
-						max={100}
 						step={0.5}
 						unit="km"
-						issue={iss('clustering.mergeLabelKm')}
+						{issues}
 					/>
 					<Slider
 						label="Dominant place share"
+						field="clustering.dominantShare"
 						bind:value={config.clustering.dominantShare}
-						min={0}
-						max={1}
 						step={0.05}
-						hint="Above this share of a trip's GPS photos, that place names the album."
-						issue={iss('clustering.dominantShare')}
+						{issues}
 					/>
 					<Slider
 						label="Trip gap"
+						field="clustering.tripGapHours"
 						bind:value={config.clustering.tripGapHours}
-						min={1}
-						max={336}
 						unit="hours"
-						hint="A gap longer than this starts a new trip."
-						issue={iss('clustering.tripGapHours')}
+						{issues}
 					/>
 					<Slider
 						label="Trip minimum photos"
+						field="clustering.tripMinPhotos"
 						bind:value={config.clustering.tripMinPhotos}
-						min={1}
-						max={500}
-						issue={iss('clustering.tripMinPhotos')}
+						{issues}
 					/>
 					<Slider
 						label="Trip minimum days"
+						field="clustering.tripMinDays"
 						bind:value={config.clustering.tripMinDays}
-						min={1}
-						max={30}
-						hint="Below this, the cluster is considered for a day trip instead."
-						issue={iss('clustering.tripMinDays')}
+						{issues}
 					/>
 					<Slider
 						label="Day trip minimum photos"
+						field="clustering.daytripMinPhotos"
 						bind:value={config.clustering.daytripMinPhotos}
-						min={1}
-						max={500}
-						issue={iss('clustering.daytripMinPhotos')}
+						{issues}
 					/>
 					<Slider
 						label="Gathering gap"
+						field="clustering.gatherGapHours"
 						bind:value={config.clustering.gatherGapHours}
-						min={0.5}
-						max={48}
 						step={0.5}
 						unit="hours"
-						issue={iss('clustering.gatherGapHours')}
+						{issues}
 					/>
 					<Slider
 						label="Gathering minimum photos"
+						field="clustering.gatherMinPhotos"
 						bind:value={config.clustering.gatherMinPhotos}
-						min={1}
-						max={500}
-						issue={iss('clustering.gatherMinPhotos')}
+						{issues}
 					/>
 					<Slider
 						label="Gathering minimum guests"
+						field="clustering.gatherMinGuests"
 						bind:value={config.clustering.gatherMinGuests}
-						min={1}
-						max={20}
-						hint="Named faces at home who are not household."
-						issue={iss('clustering.gatherMinGuests')}
+						{issues}
 					/>
 				</Stack>
 			</CardBody>
@@ -531,31 +506,28 @@
 				<Stack gap={2}>
 					<Slider
 						label="Person year minimum photos"
+						field="personYears.minPhotos"
 						bind:value={config.personYears.minPhotos}
-						min={1}
-						max={2000}
-						issue={iss('personYears.minPhotos')}
+						{issues}
 					/>
 					<Slider
 						label="Household minimum photos"
+						field="personYears.householdMinPhotos"
 						bind:value={config.personYears.householdMinPhotos}
-						min={1}
-						max={2000}
-						issue={iss('personYears.householdMinPhotos')}
+						{issues}
 					/>
 					<Field
 						label="GPS-less era ends"
-						description="Before this date, GPS-less photos fall into seasonal buckets."
+						description={hint('seasons.noGpsEraEnd')}
 						invalid={!!iss('seasons.noGpsEraEnd')}
 					>
 						<Input type="date" bind:value={config.seasons.noGpsEraEnd} />
 					</Field>
 					<Slider
 						label="Season minimum photos"
+						field="seasons.minPhotos"
 						bind:value={config.seasons.minPhotos}
-						min={1}
-						max={500}
-						issue={iss('seasons.minPhotos')}
+						{issues}
 					/>
 				</Stack>
 			</CardBody>
@@ -651,7 +623,7 @@
 				<Stack gap={1}>
 					{#each config.overrides as override, i (i)}
 						<HStack gap={2}>
-							<Select bind:value={override.kind} options={KINDS} class="w-40" />
+							<Select bind:value={override.kind} options={[...PLAN_KINDS]} class="w-40" />
 							<Input size="small" bind:value={override.keyPrefix} placeholder="2020-08" />
 							<Input size="small" bind:value={override.name} placeholder="Around Lake Michigan" />
 							<IconButton
@@ -670,7 +642,7 @@
 							size="tiny"
 							leadingIcon={mdiPlus}
 							onclick={() =>
-								config?.overrides.push({ kind: 'trip' as PlanKind, keyPrefix: '', name: '' })}
+								config?.overrides.push({ kind: 'trip' as const, keyPrefix: '', name: '' })}
 						>
 							Add override
 						</Button>
