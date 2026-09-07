@@ -17,7 +17,7 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `server/`: SvelteKit UI, `@immich/ui` components on Tailwind 4 so it matches Immich. Imports `src/` through the
   `$core` alias (`server/vite.config.ts`). `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire
   types. Routes: `GET`/`POST /api/preview` (saved config, draft config), `POST /api/apply`, `GET`/`PUT /api/config`,
-  `GET /api/people`. One page, `/`: handles left, albums right. A draft preview carries no token, so only a plan from
+  `GET /api/people`, `GET /api/people/<id>/thumbnail`, `GET /api/geocode`. One page, `/`: handles left, albums right. A draft preview carries no token, so only a plan from
   the saved config can be applied. Apply needs the preview token plus `confirm: true`, and
   `apply.ts` is the only path that mutates Immich. Config writes need the file etag, are validated field by field in
   `config-io.ts`, keep a `.bak` and swap through a temp file. `DEMO=1` swaps in a fixture library, apply then dry runs.
@@ -28,6 +28,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `config.toml` is local and gitignored: it holds homes and household names. `config.example.toml` is the committed
   starting point, `test/fixtures/config.toml` is the tests' own copy, `config.schema.json` is the generated schema.
 - A missing config answers 404 on every route with the hint to copy the example.
+- Address lookups try Immich's geodata first. Nominatim is the fallback and sends the query out, so it stays
+  switchable off with `GEOCODER=immich`.
 
 ## Invariants
 - Planner and reconcile stay pure so a Svelte UI and, later, an Immich WASM plugin can wrap them.
@@ -39,7 +41,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Event kinds (trip, daytrip, gathering) match existing albums by >=50% asset overlap within 45 days; person, season, event match by key.
 - The API key comes from `IMMICH_API_KEY` only. Never write it to config or logs.
 - Immich API facts verified against the OpenAPI spec: `POST /search/metadata` (page/size/withExif/visibility/personIds/takenAfter as full ISO datetime),
-  `GET /people?withHidden=false&page&size`, `GET /people/{id}/thumbnail` (octet-stream), `GET/POST/PATCH /albums`,
+  `GET /people?withHidden=false&page&size`, `GET /people/{id}/thumbnail` (octet-stream),
+  `GET /search/places?name=` (`{name, latitude, longitude, admin1name, admin2name}`), `GET/POST/PATCH /albums`,
   `PUT/DELETE /albums/{id}/assets`. Permissions needed:
   asset.read, person.read, album.read, album.create, album.update, albumAsset.create, albumAsset.delete, user.read.
 

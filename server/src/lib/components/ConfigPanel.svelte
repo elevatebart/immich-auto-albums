@@ -22,7 +22,7 @@
 	} from '@immich/ui';
 	import { PLAN_KINDS, schemaField, type ConfigIssue } from '$core/schema.js';
 	import type { Config } from '$core/types.js';
-	import HomesMap from '$lib/components/HomesMap.svelte';
+	import AddressLookup from '$lib/components/AddressLookup.svelte';
 	import PeoplePicker from '$lib/components/PeoplePicker.svelte';
 	import Slider from '$lib/components/Slider.svelte';
 	import type { Person } from '$lib/types';
@@ -46,16 +46,38 @@
 		toml
 	}: Props = $props();
 
-	let map = $state<HomesMap | null>(null);
 	let showToml = $state(false);
 
 	const today = () => new Date().toISOString().slice(0, 10);
 	const iss = (field: string) => issues.find((i) => i.field === field)?.message;
 	const hint = (field: string) => schemaField(field).description;
 
-	const addHome = () => config.homes.push(map?.addAtCenter() ?? { from: today(), lat: 46.5, lon: 4 });
 	const sortHomes = () => config.homes.sort((a, b) => a.from.localeCompare(b.from));
 	const outOfOrder = $derived(config.homes.some((h, i, all) => i > 0 && h.from < all[i - 1].from));
+	const rowLabel = (h: { label?: string; from: string }, i: number) =>
+		h.label?.trim() || `row ${i + 1} (${h.from})`;
+
+	const addHome = () =>
+		config.homes.push({
+			from: today(),
+			lat: config.homes.at(-1)?.lat ?? 46.5,
+			lon: config.homes.at(-1)?.lon ?? 4
+		});
+
+	/** A found place either starts a new home or replaces the coordinates of one. */
+	function place(hit: { name: string; lat: number; lon: number }, target: number) {
+		// 5 decimals is a metre, and the home radius is kilometres.
+		const [lat, lon] = [Number(hit.lat.toFixed(5)), Number(hit.lon.toFixed(5))];
+		if (target < 0) {
+			config.homes.push({ from: today(), lat, lon, label: hit.name });
+			return;
+		}
+		const home = config.homes[target];
+		if (!home) return;
+		home.lat = lat;
+		home.lon = lon;
+		home.label ||= hit.name;
+	}
 </script>
 
 <Stack gap={4}>
@@ -201,7 +223,7 @@
 		</CardHeader>
 		<CardBody>
 			<Stack gap={3}>
-				<HomesMap bind:this={map} bind:homes={config.homes} />
+				<AddressLookup targets={config.homes.map(rowLabel)} onpick={place} />
 				{#if outOfOrder}
 					<Alert color="warning" title="Out of order">
 						Homes must run oldest first.
@@ -210,7 +232,8 @@
 						</Button>
 					</Alert>
 				{/if}
-				<table class="w-full text-sm">
+				<div class="overflow-x-auto">
+				<table class="w-full min-w-[26rem] text-sm">
 					<thead class="text-primary">
 						<tr class="border-subtle border-b text-left">
 							<th class="py-1 pe-2 font-medium">From</th>
@@ -250,9 +273,10 @@
 						{/each}
 					</tbody>
 				</table>
+				</div>
 				<div>
 					<Button variant="outline" size="tiny" leadingIcon={mdiPlus} onclick={addHome}>
-						Add home at map centre
+						Add empty home
 					</Button>
 				</div>
 			</Stack>

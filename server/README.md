@@ -10,7 +10,7 @@ SvelteKit UI for the planner. Roadmap item 1, first slice: read-only preview.
 missing.
 
 Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (default `../config.toml`),
-`WINDOW_DAYS`. The key stays server side; it is never sent to the browser or written to the config.
+`WINDOW_DAYS`, `GEOCODER=immich` to keep address lookups off the internet. The key stays server side; it is never sent to the browser or written to the config.
 `server/.env` works in dev and is gitignored.
 
 ## What is here
@@ -28,6 +28,9 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
 - `GET /api/people` -> `PeopleResponse`: named people from Immich, for the household and "me" pickers.
 - `GET /api/people/<id>/thumbnail`: proxies Immich's person thumbnail so the key stays server side. The id must be
   a UUID, anything else is 404, and the picker falls back to initials whenever the image does not load.
+- `GET /api/geocode?q=` -> `{ hits: GeoHit[] }`: address to coordinates for the homes. Immich's own geodata first
+  (`GET /search/places`, place level, nothing leaves the network), and only when that finds nothing, Nominatim for
+  street level, which does send the query out. `GEOCODER=immich` turns that fallback off.
 - `GET /api/config` -> `ConfigResponse`: the parsed `Config`, the file text and an etag.
 - `PUT /api/config` -> `ConfigWriteResponse`. Body: `{ etag, config, dryRun? }`. Replaces the file wholesale, so it
   takes the etag from GET and answers 409 when the file moved underneath. Every field is validated and all problems
@@ -37,8 +40,9 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   the albums tagged with the old one.
 - `/` is the whole app: config handles on the left, the albums they produce on the right. `/config` redirects here.
   Left (`ConfigPanel.svelte`): sliders for everything numeric, `MultiSelect` of Immich people for the household, a
-  Leaflet map with draggable pins for the homes, native date inputs for the quiet period and the fixed events, row
-  editors for aliases, events and overrides, and the rendered TOML. Check file renders it through the dry run; Save
+  tile picker with Immich thumbnails for "me" and the household, an address lookup that fills a home's coordinates,
+  native date inputs for the quiet period and the fixed events, row editors for aliases, events and overrides, and
+  the rendered TOML. Check file renders it through the dry run; Save
   writes it.
   Right (`AlbumsPanel.svelte`): the planned albums with create, update, rename, kept-name and unchanged badges, a
   kind filter, an unchanged-rows toggle, and a Leaflet map of the cluster centroids sized by photo count and coloured
@@ -51,9 +55,9 @@ as source and bundled by Vite. No copy, no build step in the parent.
 
 The UI is built from `@immich/ui` (pinned) on Tailwind 4, with its theme imported in `src/app.css`, so the pages look
 like Immich rather than like a second product. Three things are hand-rolled because the library has no equivalent: the
-slider row in `src/lib/components/Slider.svelte` and the two Leaflet maps, `HomesMap.svelte` and `CentroidsMap.svelte`,
-which share `src/lib/leaflet.ts`. Both maps fit their bounds only once the container has a real size, since Leaflet
-otherwise lands on zoom 0, and only refit when the data changes, so a pan or a click is never undone. Wide data tables are plain
+slider in `src/lib/components/Slider.svelte`, the person tiles in `PeoplePicker.svelte`, and the Leaflet map in
+`CentroidsMap.svelte`. The map fits its bounds only once the container has a real size, since Leaflet otherwise lands
+on zoom 0, and only refits when the data changes, so a pan or a click is never undone. Wide data tables are plain
 `<table>` elements, since the library's `Table` distributes columns evenly.
 
 Config values are camelCase on the wire and snake_case in the file; `toToml` owns that mapping and regenerates the

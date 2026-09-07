@@ -102,3 +102,12 @@ export interface PeopleResponse {
 	source: 'immich' | 'fixture';
 	people: Person[];
 }
+
+export interface GeoHit {
+	name: string;
+	detail?: string;
+	lat: number;
+	lon: number;
+	/** "immich" is its own geodata, "nominatim" means the query left the network. */
+	source: 'immich' | 'nominatim';
+}
