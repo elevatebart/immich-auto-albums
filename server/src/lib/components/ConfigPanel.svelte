@@ -236,16 +236,19 @@
 				<table class="w-full min-w-[26rem] text-sm">
 					<thead class="text-primary">
 						<tr class="border-subtle border-b text-left">
+							<th class="py-1 pe-2 font-medium">Label</th>
 							<th class="py-1 pe-2 font-medium">From</th>
 							<th class="py-1 pe-2 font-medium">Latitude</th>
 							<th class="py-1 pe-2 font-medium">Longitude</th>
-							<th class="py-1 pe-2 font-medium">Label</th>
 							<th></th>
 						</tr>
 					</thead>
 					<tbody>
 						{#each config.homes as home, i (i)}
 							<tr class="border-subtle border-b">
+								<td class="py-1 pe-2">
+									<Input size="small" bind:value={home.label} placeholder="optional" />
+								</td>
 								<td class="py-1 pe-2">
 									<Input type="date" size="small" bind:value={home.from} />
 								</td>
@@ -254,9 +257,6 @@
 								</td>
 								<td class="py-1 pe-2">
 									<NumberInput size="small" step={0.00001} bind:value={home.lon} />
-								</td>
-								<td class="py-1 pe-2">
-									<Input size="small" bind:value={home.label} placeholder="optional" />
 								</td>
 								<td class="py-1">
 									<IconButton
