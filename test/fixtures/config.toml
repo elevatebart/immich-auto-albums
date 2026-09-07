@@ -13,8 +13,6 @@ household = ["Sam Rivers", "Nadia Rivers", "Theo Rivers"]
 with_share = 0.4          # share of a trip's face-tagged photos a guest must appear in to be named
 with_min_tagged = 5       # minimum face-tagged photos before naming anyone
 max_named = 3
-no_people_from = 2023-06-01   # trips starting in this range never get "with ..."
-no_people_to = 2023-07-31
 no_people_places = ["Versoix", "Bilieu"]
 
 # Homes, in chronological order. Each applies until the next one starts.

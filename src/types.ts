@@ -37,8 +37,6 @@ export interface Config {
     withShare: number;
     withMinTagged: number;
     maxNamed: number;
-    noPeopleFrom?: string;
-    noPeopleTo?: string;
     noPeoplePlaces: string[];
   };
   homes: Home[];

@@ -124,10 +124,8 @@ export const joinNames = (names: string[]) =>
   names.length === 1 ? names[0] : `${names.slice(0, -1).join(", ")} & ${names[names.length - 1]}`;
 
 export function withPeople(cfg: Config, cluster: Asset[], place: string): string {
-  const start = dayOf(cluster[0].t);
-  const { noPeopleFrom, noPeopleTo, noPeoplePlaces, household, withMinTagged, withShare, maxNamed } = cfg.people;
+  const { noPeoplePlaces, household, withMinTagged, withShare, maxNamed } = cfg.people;
   if (noPeoplePlaces.includes(place)) return "";
-  if (noPeopleFrom && noPeopleTo && start >= noPeopleFrom && start <= noPeopleTo) return "";
   const tagged = cluster.filter((a) => a.people.size);
   if (tagged.length < withMinTagged) return "";
   const hh = new Set(household);

@@ -17,7 +17,6 @@
 		NumberInput,
 		Select,
 		Stack,
-		Switch,
 		Text
 	} from '@immich/ui';
 	import { PLAN_KINDS, schemaField, type ConfigIssue } from '$core/schema.js';
@@ -157,29 +156,6 @@
 					bind:value={config.people.maxNamed}
 					{issues}
 				/>
-				<div>
-					<HStack gap={2} class="pb-2">
-						<Switch
-							checked={!!config.people.noPeopleFrom}
-							onCheckedChange={(on) => {
-								if (!config) return;
-								config.people.noPeopleFrom = on ? today() : undefined;
-								config.people.noPeopleTo = on ? today() : undefined;
-							}}
-						/>
-						<Label label="Quiet period, no names in titles" size="small" />
-					</HStack>
-					{#if config.people.noPeopleFrom !== undefined}
-						<HStack gap={2}>
-							<Field label="From" invalid={!!iss('people.noPeopleFrom')}>
-								<Input type="date" bind:value={config.people.noPeopleFrom} />
-							</Field>
-							<Field label="To" invalid={!!iss('people.noPeopleTo')}>
-								<Input type="date" bind:value={config.people.noPeopleTo} />
-							</Field>
-						</HStack>
-					{/if}
-				</div>
 				<div>
 					<Label label="Places that never get names" size="small" />
 					<Text color="muted" size="small" class="mb-2">{hint('people.noPeoplePlaces')}</Text>

@@ -15,7 +15,7 @@ const obj = (properties: Record<string, unknown>, description?: string) => ({
   additionalProperties: false,
 });
 
-const OPTIONAL = new Set(["label", "noPeopleFrom", "noPeopleTo"]);
+const OPTIONAL = new Set(["label"]);
 
 /** JSON Schema for `Config`, the camelCase shape. TOML key mapping stays in config.ts. */
 export const configSchema = {
@@ -29,19 +29,14 @@ export const configSchema = {
       windowDays: int(1, 3650, "Rolling window for trips, day trips and gatherings."),
       marker: text("Album description prefix. Only albums carrying it are ever touched."),
     }),
-    people: {
-      ...obj({
-        me: text("Immich person name of the library owner."),
-        household: { type: "array", items: text("Immich person name."), default: [], description: "Never named in a title, and eligible for a person year on a lower photo count." },
-        withShare: num(0, 1, "Share of a trip's face-tagged photos a guest must appear in to be named."),
-        withMinTagged: int(0, 500, "Minimum face-tagged photos in a cluster before anyone is named."),
-        maxNamed: int(1, 20, "Maximum guests named in one album title."),
-        noPeopleFrom: day("Start of a period where titles never name anyone."),
-        noPeopleTo: day("End of that period."),
-        noPeoplePlaces: { type: "array", items: text("Place name as it appears in album titles."), default: [], description: "Places whose albums never name anyone." },
-      }),
-      dependentRequired: { noPeopleFrom: ["noPeopleTo"], noPeopleTo: ["noPeopleFrom"] },
-    },
+    people: obj({
+      me: text("Immich person name of the library owner."),
+      household: { type: "array", items: text("Immich person name."), default: [], description: "Never named in a title, and eligible for a person year on a lower photo count." },
+      withShare: num(0, 1, "Share of a trip's face-tagged photos a guest must appear in to be named."),
+      withMinTagged: int(0, 500, "Minimum face-tagged photos in a cluster before anyone is named."),
+      maxNamed: int(1, 20, "Maximum guests named in one album title."),
+      noPeoplePlaces: { type: "array", items: text("Place name as it appears in album titles."), default: [], description: "Places whose albums never name anyone." },
+    }),
     homes: {
       type: "array",
       minItems: 1,

@@ -73,18 +73,6 @@
           "maximum": 20,
           "description": "Maximum guests named in one album title."
         },
-        "noPeopleFrom": {
-          "type": "string",
-          "format": "date",
-          "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
-          "description": "Start of a period where titles never name anyone."
-        },
-        "noPeopleTo": {
-          "type": "string",
-          "format": "date",
-          "pattern": "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$",
-          "description": "End of that period."
-        },
         "noPeoplePlaces": {
           "type": "array",
           "items": {
@@ -102,15 +90,7 @@
         "withMinTagged",
         "maxNamed"
       ],
-      "additionalProperties": false,
-      "dependentRequired": {
-        "noPeopleFrom": [
-          "noPeopleTo"
-        ],
-        "noPeopleTo": [
-          "noPeopleFrom"
-        ]
-      }
+      "additionalProperties": false
     },
     "homes": {
       "type": "array",

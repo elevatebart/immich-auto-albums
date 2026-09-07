@@ -28,8 +28,6 @@ export function fromToml(text: string): Config {
       withShare: pe.with_share ?? 0.4,
       withMinTagged: pe.with_min_tagged ?? 5,
       maxNamed: pe.max_named ?? 3,
-      noPeopleFrom: pe.no_people_from ? day(pe.no_people_from) : undefined,
-      noPeopleTo: pe.no_people_to ? day(pe.no_people_to) : undefined,
       noPeoplePlaces: pe.no_people_places ?? [],
     },
     homes: ((c.homes ?? []) as Raw[]).map((h) => ({ from: day(h.from), lat: h.lat, lon: h.lon, label: h.label })),
@@ -91,10 +89,6 @@ export function toToml(c: Config): string {
   row("with_share", c.people.withShare, "share of a trip's face-tagged photos a guest must appear in to be named");
   row("with_min_tagged", c.people.withMinTagged, "minimum face-tagged photos before naming anyone");
   row("max_named", c.people.maxNamed);
-  if (c.people.noPeopleFrom && c.people.noPeopleTo) {
-    row("no_people_from", c.people.noPeopleFrom, 'trips starting in this range never get "with ..."');
-    row("no_people_to", c.people.noPeopleTo);
-  }
   row("no_people_places", list(c.people.noPeoplePlaces));
 
   head("# Homes, in chronological order. Each applies until the next one starts.");

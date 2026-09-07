@@ -66,7 +66,6 @@ describe("configSchema", () => {
     ["no homes", (c: any) => (c.homes = []), "homes"],
     ["an unknown key", (c: any) => (c.clustering.homeMiles = 12), "clustering.homeMiles"],
     ["a malformed date", (c: any) => (c.events[0].from = "30-08-2019"), "events[0].from"],
-    ["a half-open quiet period", (c: any) => delete c.people.noPeopleTo, "people.noPeopleTo"],
     ["homes out of order", (c: any) => c.homes.reverse(), "homes[1].from"],
     ["an event ending before it starts", (c: any) => (c.events[0].to = "2019-08-01"), "events[0].to"],
   ])("rejects %s", (_name, mutate, field) => {

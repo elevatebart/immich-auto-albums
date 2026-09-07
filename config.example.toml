@@ -18,9 +18,6 @@ with_share = 0.4          # share of a trip's face-tagged photos a guest must ap
 with_min_tagged = 5       # minimum face-tagged photos before naming anyone
 max_named = 3
 no_people_places = []     # places whose albums never name anyone, for example ["Home Village"]
-# Optional quiet period. Set both or neither.
-# no_people_from = 2023-06-01
-# no_people_to = 2023-07-31
 
 # Homes, in chronological order. Each applies until the next one starts.
 # Coordinates only need to be close: home_km below decides what counts as home.
