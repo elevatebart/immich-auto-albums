@@ -7,6 +7,12 @@ body {
 	background-color: var(--immich-ui-gray);
 }
 
+/* Leaflet's panes use z-index 400 and up, which would sit over a z-50 modal. */
+.leaflet-container {
+	isolation: isolate;
+	z-index: 0;
+}
+
 /* Leaflet renders markers outside the components, so their classes are global. */
 .centroid {
 	fill-opacity: 0.35;
