@@ -21,8 +21,13 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 		const action = computed.actions.find((a) => rowId(a) === body.id);
 		if (!action) return json({ error: `no album ${body.id} in this plan` }, { status: 404 });
+		const points = action.plan.ids
+			.map((id) => computed.gps.get(id))
+			.filter((p): p is { lat: number; lon: number } => !!p)
+			.slice(0, 500);
 		return json({
 			id: body.id,
+			points,
 			name: action.op === 'update' || action.op === 'rename' ? (action.userRenamed ? action.album.name : action.plan.name) : action.plan.name,
 			ids: action.plan.ids.slice(0, CAP),
 			total: action.plan.ids.length,

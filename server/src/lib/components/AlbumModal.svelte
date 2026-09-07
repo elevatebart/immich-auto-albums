@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { mdiImageMultipleOutline } from '@mdi/js';
 	import { Badge, HStack, Modal, ModalBody, ModalFooter, Stack, Text } from '@immich/ui';
+	import PointsMap from '$lib/components/PointsMap.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import type { AlbumAssets, PreviewRow } from '$lib/types';
 
@@ -69,6 +70,10 @@
 					</HStack>
 				{/if}
 			</HStack>
+
+			{#if data?.points.length && (row.kind === 'trip' || row.kind === 'daytrip')}
+				<PointsMap points={data.points} />
+			{/if}
 
 			{#if error}
 				<Text color="danger" size="small">{error}</Text>

@@ -43,6 +43,8 @@ export interface Computed {
 	actions: Action[];
 	cfg: Config;
 	live: boolean;
+	/** Coordinates of the GPS assets, so an album can be drawn on a map. */
+	gps: Map<string, { lat: number; lon: number }>;
 }
 
 interface Snapshot {
@@ -104,7 +106,6 @@ const rowOf = (a: Action): PreviewRow => {
 		userRenamed: moves && a.userRenamed,
 		albumId: a.op === 'create' ? undefined : a.album.id,
 		albumName: a.op === 'create' ? undefined : a.album.name,
-		centroid: a.plan.centroid,
 		// Enough for the strip in the list. The modal asks for the rest.
 		sample: a.plan.ids.slice(0, 4)
 	};
@@ -136,10 +137,15 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 	const actions = reconcile(plans, snap.albums);
 	const rows = actions.map(rowOf);
 	const count = (op: PreviewRow['op']) => rows.filter((r) => r.op === op).length;
+	const gps = new Map<string, { lat: number; lon: number }>();
+	for (const a of snap.assets) {
+		if (a.lat !== null && a.lon !== null) gps.set(a.id, { lat: a.lat, lon: a.lon });
+	}
 	return {
 		cfg,
 		actions,
 		live: snap.source === 'immich',
+		gps,
 		data: {
 			generatedAt: now.toISOString(),
 			source: snap.source,

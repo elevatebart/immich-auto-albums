@@ -51,8 +51,7 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   writes it.
   Right (`AlbumsPanel.svelte`): the planned albums with create, update, rename, kept-name and unchanged badges, four
   thumbnails per row, the album name opening a full grid in a modal with the joining and leaving photos ringed, a
-  kind filter, an unchanged-rows toggle, and a Leaflet map of the cluster centroids sized by photo count and coloured
-  like the badges. Clicking a circle highlights its row, clicking a row pans to its circle.
+  kind filter and an unchanged-rows toggle. A trip or day trip modal also plots where its photos were taken.
   Move any handle and the right panel replans 400 ms later from the draft, without saving. Apply stays disabled until
   the config on screen matches the file, so what gets written is always what a scheduled run would write.
 

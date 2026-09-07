@@ -72,9 +72,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Names in albums are English; place names come from Immich's geocoder through `normPlace` (aliases in config).
 
 ## Roadmap
-1. Done. `server/` holds the API key, exposes preview, apply, config and people. The UI has the clustering sliders, the
-   people picker, the Leaflet homes map, event date pickers, the preview table with badges and the centroid map, which
-   is cross-linked with the table through a focused row id.
+1. Done. `server/` holds the API key, exposes preview, apply, config, people, geocode and album assets. The UI has the
+   clustering sliders, the face-tile people picker, an address lookup for the homes, event date pickers, and the album
+   list with badges, thumbnails and a modal that shows the whole album plus, for a trip, where its photos were taken.
 2. Done. `src/schema.ts` holds the schema, `config.schema.json` is the generated artifact for outside consumers, and
    the form takes every slider range and hint from it.
 3. Done. `Dockerfile` has a `cli` target for the scheduled run and a default target that adds the UI, both on

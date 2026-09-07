@@ -20,7 +20,6 @@ export interface PreviewRow {
 	userRenamed: boolean;
 	albumId?: string;
 	albumName?: string;
-	centroid?: { lat: number; lon: number };
 	/** First few asset ids, for the thumbnails in the list. */
 	sample: string[];
 }
@@ -123,6 +122,8 @@ export interface GeoHit {
 export interface AlbumAssets {
 	id: string;
 	name: string;
+	/** Where the album's GPS photos were taken, capped. Empty for an album with no GPS. */
+	points: { lat: number; lon: number }[];
 	/** Asset ids the album will hold, capped; `total` is the real count. */
 	ids: string[];
 	total: number;

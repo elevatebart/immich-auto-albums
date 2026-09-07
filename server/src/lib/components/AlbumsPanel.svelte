@@ -2,7 +2,6 @@
 	import { SvelteSet } from 'svelte/reactivity';
 	import { Badge, Card, CardBody, Checkbox, HStack, Select, Stack, Text } from '@immich/ui';
 	import AlbumModal from '$lib/components/AlbumModal.svelte';
-	import CentroidsMap from '$lib/components/CentroidsMap.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import type { Preview, PreviewRow } from '$lib/types';
 
@@ -34,8 +33,6 @@
 
 	let hideNoop = $state(true);
 	let kind = $state('all');
-	let focused = $state<string | undefined>(undefined);
-
 	const kinds = $derived(['all', ...new Set(preview.rows.map((r) => r.kind))].sort());
 	const rows = $derived(
 		[...preview.rows]
@@ -43,11 +40,6 @@
 			.filter((r) => kind === 'all' || r.kind === kind)
 			.sort((a, b) => b.start.localeCompare(a.start))
 	);
-
-	/** A click on the map scrolls its row into view. */
-	$effect(() => {
-		if (focused) document.getElementById(`row-${focused}`)?.scrollIntoView({ block: 'nearest' });
-	});
 
 	const toggle = (id: string) => (selected.has(id) ? selected.delete(id) : selected.add(id));
 	const opColor = (op: PreviewRow['op']) =>
@@ -65,8 +57,6 @@
 					<Badge color="secondary" size="small">fixture library</Badge>
 				{/if}
 			</Text>
-
-			<CentroidsMap {rows} bind:focused />
 
 			<HStack gap={3} class="flex-wrap">
 				<HStack gap={2}>
@@ -94,10 +84,7 @@
 					{#each rows as r (r.id)}
 						<tr
 							id="row-{r.id}"
-							class="border-subtle border-b align-top"
-							class:bg-primary-50={focused === r.id}
-							onclick={() => (focused = r.id)}
-						>
+							class="border-subtle border-b align-top">
 							<td class="py-2">
 								{#if r.op !== 'noop' && canApply}
 									<Checkbox
