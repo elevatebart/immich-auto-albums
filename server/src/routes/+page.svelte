@@ -1,6 +1,23 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
+	import { mdiCloudUploadOutline, mdiMapMarkerOutline, mdiRefresh } from '@mdi/js';
+	import {
+		Alert,
+		Badge,
+		Button,
+		Card,
+		CardBody,
+		Checkbox,
+		ConfirmModal,
+		HStack,
+		Heading,
+		Icon,
+		Link,
+		Select,
+		Stack,
+		Text
+	} from '@immich/ui';
 	import type { ApplyResponse, Preview, PreviewRow } from '$lib/types';
 
 	let preview = $state<Preview | null>(null);
@@ -57,7 +74,7 @@
 	const changed = (p: Preview) => p.rows.filter((r) => r.op !== 'noop');
 	const toggle = (id: string) => (selected.has(id) ? selected.delete(id) : selected.add(id));
 
-	const kinds = $derived([...new Set(preview?.rows.map((r) => r.kind) ?? [])].sort());
+	const kinds = $derived(['all', ...new Set((preview?.rows ?? []).map((r) => r.kind))].sort());
 	const rows = $derived(
 		[...(preview?.rows ?? [])]
 			.filter((r) => (hideNoop ? r.op !== 'noop' : true))
@@ -65,9 +82,7 @@
 			.sort((a, b) => b.start.localeCompare(a.start))
 	);
 
-	const chosen = $derived(
-		(preview ? changed(preview) : []).filter((r) => selected.has(r.id))
-	);
+	const chosen = $derived((preview ? changed(preview) : []).filter((r) => selected.has(r.id)));
 	const summary = $derived({
 		create: chosen.filter((r) => r.op === 'create').length,
 		update: chosen.filter((r) => r.op === 'update').length,
@@ -79,266 +94,166 @@
 		[r.add ? `+${r.add}` : '', r.remove ? `-${r.remove}` : ''].filter(Boolean).join(' ') || '-';
 	const osm = (c: { lat: number; lon: number }) =>
 		`https://www.openstreetmap.org/?mlat=${c.lat}&mlon=${c.lon}#map=9/${c.lat}/${c.lon}`;
+	const opColor = (op: PreviewRow['op']) =>
+		op === 'create' ? 'success' : op === 'update' ? 'warning' : 'secondary';
 </script>
 
 <svelte:head><title>immich-auto-albums preview</title></svelte:head>
 
-<header>
-	<h1>Album preview</h1>
-	<button onclick={() => load(true)} disabled={loading}>
-		{loading ? 'Scanning...' : 'Rescan'}
-	</button>
-</header>
+<Stack gap={4}>
+	<HStack class="justify-between">
+		<Stack gap={0}>
+			<Heading size="large">Album preview</Heading>
+			{#if preview}
+				<Text color="muted" size="small">
+					{preview.stats.assets} assets ({preview.stats.withGps} with GPS), {preview.stats.people}
+					named people, {preview.stats.managedAlbums} managed albums, {preview.stats.absorbed}
+					GPS-less photos absorbed into trips. Window since {preview.windowStart}.
+					{#if preview.source === 'fixture'}
+						<Badge color="secondary" size="small">fixture library</Badge>
+					{/if}
+				</Text>
+			{/if}
+		</Stack>
+		<HStack gap={2}>
+			<Button
+				variant="outline"
+				size="small"
+				leadingIcon={mdiRefresh}
+				onclick={() => load(true)}
+				disabled={loading || applying}
+			>
+				{loading ? 'Scanning...' : 'Rescan'}
+			</Button>
+			<Button
+				size="small"
+				leadingIcon={mdiCloudUploadOutline}
+				onclick={() => (confirming = true)}
+				disabled={loading || applying || !chosen.length}
+			>
+				Apply {chosen.length} selected
+			</Button>
+		</HStack>
+	</HStack>
 
-{#if error}
-	<p class="error">{error}</p>
-{/if}
-
-{#if preview}
-	<p class="stats">
-		{preview.stats.assets} assets ({preview.stats.withGps} with GPS), {preview.stats.people} named
-		people, {preview.stats.managedAlbums} managed albums, {preview.stats.absorbed} GPS-less photos
-		absorbed into trips. Window since {preview.windowStart}.
-		{#if preview.source === 'fixture'}<span class="fixture">fixture library</span>{/if}
-	</p>
-	<p class="stats">
-		<b>{preview.stats.create}</b> to create, <b>{preview.stats.update}</b> to update,
-		<b>{preview.stats.noop}</b> unchanged.
-	</p>
+	{#if error}
+		<Alert color="danger" title="Nothing was written">{error}</Alert>
+	{/if}
 
 	{#if result}
-		<p class="result">
-			{result.dryRun ? 'Dry run, nothing written' : 'Written to Immich'}: {result.applied} ok, {result.failed}
-			failed.
-			{#each result.results.filter((r) => !r.ok) as r (r.id)}
-				<span class="muted">{r.name}: {r.error}</span>
-			{/each}
-		</p>
-	{/if}
-
-	<div class="filters">
-		<label><input type="checkbox" bind:checked={hideNoop} /> hide unchanged</label>
-		<select bind:value={kind}>
-			<option value="all">all kinds</option>
-			{#each kinds as k (k)}<option value={k}>{k}</option>{/each}
-		</select>
-		<span class="muted">{rows.length} rows</span>
-		<button
-			class="primary"
-			onclick={() => (confirming = true)}
-			disabled={loading || applying || confirming || !chosen.length}
+		<Alert
+			color={result.failed ? 'warning' : 'success'}
+			title={result.dryRun ? 'Dry run, nothing written' : 'Written to Immich'}
 		>
-			Apply {chosen.length} selected
-		</button>
-	</div>
-
-	{#if confirming}
-		<div class="confirm">
-			<b>Write to Immich?</b>
-			<p>
-				{summary.create} albums created, {summary.update} updated, {summary.add} photos added, {summary.remove}
-				removed.
-				{#if preview.source === 'fixture'}
-					The fixture library has no Immich behind it, so this runs as a dry run.
-				{:else}
-					Only albums carrying the marker are touched, and album names you changed by hand are kept.
-				{/if}
-			</p>
-			<button class="primary" onclick={apply} disabled={applying}>
-				{applying ? 'Applying...' : 'Confirm and write'}
-			</button>
-			<button onclick={() => (confirming = false)} disabled={applying}>Cancel</button>
-		</div>
+			{result.applied} ok, {result.failed} failed.
+			{#each result.results.filter((r) => !r.ok) as r (r.id)}
+				<div class="text-sm">{r.name}: {r.error}</div>
+			{/each}
+		</Alert>
 	{/if}
 
-	<table>
-		<thead>
-			<tr>
-				<th class="pick"></th>
-				<th>Start</th>
-				<th>Kind</th>
-				<th>Album</th>
-				<th>Change</th>
-				<th class="num">Assets</th>
-				<th class="num">Delta</th>
-				<th>Centroid</th>
-			</tr>
-		</thead>
-		<tbody>
-			{#each rows as r (r.id)}
-				<tr>
-					<td class="pick">
-						{#if r.op !== 'noop'}
-							<input
-								type="checkbox"
-								checked={selected.has(r.id)}
-								onchange={() => toggle(r.id)}
-								aria-label="apply {r.name}"
-							/>
-						{/if}
-					</td>
-					<td class="mono">{r.start}</td>
-					<td>{r.kind}</td>
-					<td>
-						{r.userRenamed ? r.albumName : r.name}
-						{#if r.userRenamed}<div class="muted">auto: {r.name}</div>{/if}
-						{#if r.rename}<div class="muted">was: {r.albumName}</div>{/if}
-					</td>
-					<td>
-						<span class="badge {r.op}">{r.op}</span>
-						{#if r.rename}<span class="badge rename">rename</span>{/if}
-						{#if r.userRenamed}<span class="badge kept">your name</span>{/if}
-					</td>
-					<td class="num mono">{r.assets}</td>
-					<td class="num mono">{delta(r)}</td>
-					<td class="mono">
-						{#if r.centroid}
-							<a href={osm(r.centroid)} target="_blank" rel="noreferrer">
-								{r.centroid.lat.toFixed(3)}, {r.centroid.lon.toFixed(3)}
-							</a>
-						{:else}
-							-
-						{/if}
-					</td>
-				</tr>
-			{/each}
-		</tbody>
-	</table>
-{:else if loading}
-	<p class="muted">Scanning the library. A first run over a large library takes a while.</p>
-{/if}
+	{#if preview}
+		<Card>
+			<CardBody>
+				<Stack gap={3}>
+					<HStack gap={4} class="flex-wrap">
+						<HStack gap={2}>
+							<Checkbox id="hide-noop" bind:checked={hideNoop} size="small" />
+							<Text size="small" onclick={() => (hideNoop = !hideNoop)}>hide unchanged</Text>
+						</HStack>
+						<Select bind:value={kind} options={kinds} size="small" class="w-44" />
+						<Text color="muted" size="small">
+							{rows.length} of {preview.rows.length} rows, {preview.stats.create} to create,
+							{preview.stats.update} to update, {preview.stats.noop} unchanged
+						</Text>
+					</HStack>
 
-<style>
-	:global(body) {
-		margin: 0;
-		padding: 1.5rem;
-		font: 14px/1.5 ui-sans-serif, system-ui, sans-serif;
-		color: #1b1b1b;
-		background: #fbfbfa;
-	}
-	header {
-		display: flex;
-		align-items: baseline;
-		gap: 1rem;
-	}
-	h1 {
-		font-size: 1.25rem;
-		margin: 0 0 0.5rem;
-	}
-	button {
-		font: inherit;
-		padding: 0.25rem 0.75rem;
-		border: 1px solid #ccc;
-		border-radius: 4px;
-		background: #fff;
-		cursor: pointer;
-	}
-	button:disabled {
-		color: #999;
-		cursor: default;
-	}
-	.stats {
-		margin: 0.25rem 0;
-		max-width: 70ch;
-	}
-	.filters {
-		display: flex;
-		align-items: center;
-		gap: 1rem;
-		margin: 1rem 0 0.5rem;
-	}
-	.muted {
-		color: #6b6b6b;
-	}
-	.error {
-		padding: 0.5rem 0.75rem;
-		border-left: 3px solid #b42318;
-		background: #fef3f2;
-	}
-	.result {
-		display: flex;
-		flex-direction: column;
-		gap: 0.15rem;
-		padding: 0.5rem 0.75rem;
-		border-left: 3px solid #0a5c2b;
-		background: #f2fbf5;
-	}
-	.confirm {
-		max-width: 70ch;
-		padding: 0.75rem;
-		margin: 0.5rem 0;
-		border: 1px solid #e0b34d;
-		border-radius: 4px;
-		background: #fffaf0;
-	}
-	.confirm p {
-		margin: 0.35rem 0 0.75rem;
-	}
-	.primary {
-		border-color: #1b1b1b;
-		background: #1b1b1b;
-		color: #fff;
-	}
-	.primary:disabled {
-		border-color: #ccc;
-		background: #f3f3f3;
-		color: #999;
-	}
-	.pick {
-		width: 1.5rem;
-	}
-	.fixture {
-		padding: 0 0.4rem;
-		border-radius: 3px;
-		background: #eaeaea;
-	}
-	table {
-		border-collapse: collapse;
-		width: 100%;
-	}
-	th,
-	td {
-		text-align: left;
-		padding: 0.35rem 0.6rem;
-		border-bottom: 1px solid #e6e6e6;
-		vertical-align: top;
-	}
-	th {
-		font-weight: 600;
-		border-bottom: 1px solid #ccc;
-	}
-	.num {
-		text-align: right;
-	}
-	.mono {
-		font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-		white-space: nowrap;
-	}
-	.badge {
-		display: inline-block;
-		padding: 0 0.4rem;
-		border-radius: 3px;
-		font-size: 12px;
-		white-space: nowrap;
-	}
-	.create {
-		background: #dcf5e3;
-		color: #0a5c2b;
-	}
-	.update {
-		background: #fdf0d0;
-		color: #7a4a00;
-	}
-	.noop {
-		background: #ececec;
-		color: #555;
-	}
-	.rename {
-		background: #dce8fb;
-		color: #12457a;
-	}
-	.kept {
-		background: #ebe0fb;
-		color: #4b2380;
-	}
-</style>
+					<div class="overflow-x-auto">
+						<table class="w-full text-sm">
+							<thead class="text-primary">
+								<tr class="border-subtle border-b text-left">
+									<th class="w-8 py-2"></th>
+									<th class="py-2 pe-3 font-medium">Start</th>
+									<th class="py-2 pe-3 font-medium">Kind</th>
+									<th class="py-2 pe-3 font-medium">Album</th>
+									<th class="py-2 pe-3 font-medium">Change</th>
+									<th class="py-2 pe-3 text-right font-medium">Assets</th>
+									<th class="py-2 pe-3 text-right font-medium">Delta</th>
+									<th class="py-2 font-medium">Centroid</th>
+								</tr>
+							</thead>
+							<tbody>
+								{#each rows as r (r.id)}
+									<tr class="border-subtle border-b align-top">
+										<td class="py-2">
+											{#if r.op !== 'noop'}
+												<Checkbox
+													checked={selected.has(r.id)}
+													onCheckedChange={() => toggle(r.id)}
+													size="small"
+													aria-label="apply {r.name}"
+												/>
+											{/if}
+										</td>
+										<td class="py-2 pe-3 font-mono whitespace-nowrap">{r.start}</td>
+										<td class="py-2 pe-3">{r.kind}</td>
+										<td class="py-2 pe-3">
+											{r.userRenamed ? r.albumName : r.name}
+											{#if r.userRenamed}
+												<Text color="muted" size="tiny">auto: {r.name}</Text>
+											{/if}
+											{#if r.rename}
+												<Text color="muted" size="tiny">was: {r.albumName}</Text>
+											{/if}
+										</td>
+										<td class="py-2 pe-3">
+											<HStack gap={1} class="flex-wrap">
+												<Badge color={opColor(r.op)} size="small">{r.op}</Badge>
+												{#if r.rename}<Badge color="info" size="small">rename</Badge>{/if}
+												{#if r.userRenamed}<Badge color="primary" size="small">your name</Badge>{/if}
+											</HStack>
+										</td>
+										<td class="py-2 pe-3 text-right font-mono">{r.assets}</td>
+										<td class="py-2 pe-3 text-right font-mono">{delta(r)}</td>
+										<td class="py-2 font-mono whitespace-nowrap">
+											{#if r.centroid}
+												<Link href={osm(r.centroid)} target="_blank" rel="noreferrer">
+													<HStack gap={1}>
+														<Icon icon={mdiMapMarkerOutline} size="1em" />
+														{r.centroid.lat.toFixed(3)}, {r.centroid.lon.toFixed(3)}
+													</HStack>
+												</Link>
+											{:else}
+												<Text color="muted">-</Text>
+											{/if}
+										</td>
+									</tr>
+								{/each}
+							</tbody>
+						</table>
+					</div>
+				</Stack>
+			</CardBody>
+		</Card>
+	{:else if loading}
+		<Text color="muted">Scanning the library. A first run over a large library takes a while.</Text>
+	{/if}
+</Stack>
+
+{#if confirming && preview}
+	<ConfirmModal
+		title="Write to Immich?"
+		confirmText={applying ? 'Applying...' : 'Confirm and write'}
+		confirmColor="primary"
+		disabled={applying}
+		prompt={`${summary.create} albums created, ${summary.update} updated, ${summary.add} photos added, ${summary.remove} removed. ${
+			preview.source === 'fixture'
+				? 'The fixture library has no Immich behind it, so this runs as a dry run.'
+				: 'Only albums carrying the marker are touched, and album names you changed by hand are kept.'
+		}`}
+		onClose={(confirmed) => {
+			confirming = false;
+			if (confirmed) apply();
+		}}
+	/>
+{/if}

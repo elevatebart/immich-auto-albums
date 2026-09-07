@@ -1,0 +1,16 @@
+@import '@immich/ui/theme/default.css';
+
+/* Tailwind must see the class strings inside the prebuilt @immich/ui components. */
+@source '../node_modules/@immich/ui/dist';
+
+body {
+	background-color: var(--immich-ui-gray);
+}
+
+/* Leaflet draws outside the component, so its pin needs a global class. */
+.home-pin {
+	border: 2px solid var(--immich-ui-light);
+	border-radius: 50%;
+	background-color: var(--immich-ui-primary-500);
+	box-shadow: 0 0 0 1px var(--immich-ui-primary-500);
+}

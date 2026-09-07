@@ -90,3 +90,13 @@ export interface ConfigWriteResponse extends ConfigResponse {
 	warnings: string[];
 	backup?: string;
 }
+
+export interface Person {
+	id: string;
+	name: string;
+}
+
+export interface PeopleResponse {
+	source: 'immich' | 'fixture';
+	people: Person[];
+}

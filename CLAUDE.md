@@ -10,9 +10,10 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   template). TOML keys are snake_case, `Config` is camelCase.
 - `src/immich.ts`: fetch client for the Immich REST API (`x-api-key` header, `/api` prefix).
 - `src/cli.ts`: `preview` and `apply`. Writes `run_*.log`, `decisions_*.csv`, `plan_*.json` to `out_dir`.
-- `server/`: SvelteKit UI. Imports `src/` through the `$core` alias (`server/vite.config.ts`).
-  `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire types. `GET /api/preview` and
-  `POST /api/apply` and `GET`/`PUT /api/config` exist. Apply needs the preview token plus `confirm: true`, and
+- `server/`: SvelteKit UI, `@immich/ui` components on Tailwind 4 so it matches Immich. Imports `src/` through the
+  `$core` alias (`server/vite.config.ts`). `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire
+  types. Routes: `GET /api/preview`, `POST /api/apply`, `GET`/`PUT /api/config`, `GET /api/people`. Pages: `/` preview
+  table, `/config` form. Apply needs the preview token plus `confirm: true`, and
   `apply.ts` is the only path that mutates Immich. Config writes need the file etag, are validated field by field in
   `config-io.ts`, keep a `.bak` and swap through a temp file. `DEMO=1` swaps in a fixture library, apply then dry runs.
 - `test/planner.test.ts`: golden cases. Run `npm test` before and after any planner change.
@@ -34,9 +35,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Names in albums are English; place names come from Immich's geocoder through `normPlace` (aliases in config).
 
 ## Roadmap
-1. `server/`: SvelteKit app. Server routes hold the API key, expose `GET /api/preview` (reconcile output + centroids) and `POST /api/apply`,
-   read/write `config.toml`. UI: sliders for `clustering.*`, people picker from `/api/people`, Leaflet map for homes, date pickers for events,
-   preview table with create/update/rename badges and a map of cluster centroids.
+1. Done. `server/` holds the API key, exposes preview, apply, config and people, and the UI has the clustering sliders,
+   the people picker, the Leaflet homes map, event date pickers and the preview table with badges. Still open from the
+   original sketch: a map of the cluster centroids (the preview table links each one to OSM instead).
 2. JSON Schema for `Config`, shared by the form and by a future Immich plugin settings form.
 3. Docker image for the NAS (`node:22-slim`), monthly run via DSM Task Scheduler as root.
 
