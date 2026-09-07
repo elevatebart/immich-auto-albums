@@ -56,6 +56,18 @@
 				<Text color="muted" size="small">{row.kind}, from {row.start}</Text>
 				{#if row.add}<Badge color="success" size="small">+{row.add} joining</Badge>{/if}
 				{#if row.remove}<Badge color="danger" size="small">-{row.remove} leaving</Badge>{/if}
+				{#if row.add || row.remove}
+					<HStack gap={2} class="ps-1">
+						<HStack gap={1}>
+							<span class="ring-success size-3 rounded ring-2"></span>
+							<Text color="muted" size="tiny">joining</Text>
+						</HStack>
+						<HStack gap={1}>
+							<span class="ring-danger size-3 rounded ring-2 opacity-60"></span>
+							<Text color="muted" size="tiny">leaving</Text>
+						</HStack>
+					</HStack>
+				{/if}
 			</HStack>
 
 			{#if error}

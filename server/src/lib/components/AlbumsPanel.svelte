@@ -50,10 +50,8 @@
 	});
 
 	const toggle = (id: string) => (selected.has(id) ? selected.delete(id) : selected.add(id));
-	const delta = (r: PreviewRow) =>
-		[r.add ? `+${r.add}` : '', r.remove ? `-${r.remove}` : ''].filter(Boolean).join(' ');
 	const opColor = (op: PreviewRow['op']) =>
-		op === 'create' ? 'success' : op === 'update' ? 'warning' : 'secondary';
+		op === 'create' ? 'success' : op === 'update' ? 'warning' : op === 'rename' ? 'info' : 'secondary';
 </script>
 
 <Card>
@@ -134,7 +132,11 @@
 								{/if}
 								<HStack gap={1} class="flex-wrap pt-0.5">
 									<Badge color={opColor(r.op)} size="small">{r.op}</Badge>
-									{#if r.rename}<Badge color="info" size="small">rename</Badge>{/if}
+									{#if r.op === 'update'}
+										{#if r.add}<Badge color="success" size="small">+{r.add} joining</Badge>{/if}
+										{#if r.remove}<Badge color="danger" size="small">-{r.remove} leaving</Badge>{/if}
+									{/if}
+									{#if r.rename && r.op !== 'rename'}<Badge color="info" size="small">rename</Badge>{/if}
 									{#if r.userRenamed}<Badge color="primary" size="small">your name</Badge>{/if}
 								</HStack>
 								{#if r.userRenamed}<Text color="muted" size="tiny">auto: {r.name}</Text>{/if}
@@ -142,7 +144,6 @@
 							</td>
 							<td class="py-2 text-right">
 								<div class="font-mono">{r.assets}</div>
-								{#if delta(r)}<Text color="muted" size="tiny">{delta(r)}</Text>{/if}
 							</td>
 						</tr>
 					{/each}
