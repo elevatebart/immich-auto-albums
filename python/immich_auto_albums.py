@@ -33,7 +33,6 @@ def load_config(path):
         WITH_SHARE=pe.get("with_share", 0.4),
         WITH_MIN_TAGGED=pe.get("with_min_tagged", 5),
         MAX_NAMED=pe.get("max_named", 3),
-        NO_PEOPLE_NAMING=(pe.get("no_people_from", date.min), pe.get("no_people_to", date.min)),
         NO_PEOPLE_PLACES=set(pe.get("no_people_places", [])),
         HOMES=[(h["from"], h["lat"], h["lon"]) for h in c["homes"]],
         HOME_KM=cl["home_km"], PLACE_KM=cl["place_km"], MERGE_LABEL_KM=cl["merge_label_km"],
@@ -241,8 +240,7 @@ def month_span(start, end):
 
 
 def with_people(cluster, place):
-    start = cluster[0]["t"].date()
-    if place in NO_PEOPLE_PLACES or NO_PEOPLE_NAMING[0] <= start <= NO_PEOPLE_NAMING[1]:
+    if place in NO_PEOPLE_PLACES:
         return ""
     with_faces = [a for a in cluster if a["people"]]
     if len(with_faces) < WITH_MIN_TAGGED:

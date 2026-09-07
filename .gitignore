@@ -7,6 +7,8 @@ server/build/
 /config.toml.bak
 /config.toml.tmp
 
+__pycache__/
+
 run_*.log
 decisions_*.csv
 plan_*.json
