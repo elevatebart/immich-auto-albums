@@ -56,27 +56,42 @@ const existing = await client.fetchManagedAlbums(cfg.immich.marker);
 log(`Existing auto albums: ${existing.length}`);
 const actions = reconcile(plans, existing);
 
-const csv = ["kind,action,album,assets,detail"];
+const csv = ["kind,action,album,assets,detail,error"];
 const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
-for (const a of actions) {
-  if (a.op === "noop") continue;
+let failed = 0;
+
+/** One album's writes. A failure is recorded and the run carries on to the next album. */
+async function write(a: Extract<(typeof actions)[number], { op: "create" | "update" | "rename" }>) {
   const desc = descriptionFor(cfg.immich.marker, a.plan);
   if (a.op === "create") {
-    csv.push([a.plan.kind, "create", q(a.plan.name), a.plan.ids.length, ""].join(","));
-    log(`  create  ${a.plan.kind.padEnd(9)} ${a.plan.name} (${a.plan.ids.length}) key=${a.plan.key}`);
-    if (mode === "apply") await client.createAlbum(a.plan.name, desc, [...a.plan.ids].sort());
-    continue;
+    await client.createAlbum(a.plan.name, desc, [...a.plan.ids].sort());
+    return;
   }
-  const detail =
-    `+${a.add.length} -${a.remove.length}` +
-    (a.rename ? `, was: ${a.album.name}` : "") +
-    (a.userRenamed ? ", keeping your name" : "");
-  csv.push([a.plan.kind, a.op, q(a.plan.name), a.plan.ids.length, q(detail)].join(","));
-  log(`  ${a.op.padEnd(7)} ${a.plan.kind.padEnd(9)} ${a.plan.name} (${detail})`);
-  if (mode !== "apply") continue;
   await client.updateAlbum(a.album.id, a.userRenamed ? a.album.name : a.plan.name, desc);
   if (a.add.length) await client.addAssets(a.album.id, a.add);
   if (a.remove.length) await client.removeAssets(a.album.id, a.remove);
+}
+
+for (const a of actions) {
+  if (a.op === "noop") continue;
+  const detail =
+    a.op === "create"
+      ? `key=${a.plan.key}`
+      : `+${a.add.length} -${a.remove.length}` +
+        (a.rename ? `, was: ${a.album.name}` : "") +
+        (a.userRenamed ? ", keeping your name" : "");
+  let error = "";
+  if (mode === "apply") {
+    try {
+      await write(a);
+    } catch (e) {
+      error = (e as Error).message;
+      failed++;
+    }
+  }
+  csv.push([a.plan.kind, a.op, q(a.plan.name), a.plan.ids.length, q(detail), q(error)].join(","));
+  log(`  ${error ? "FAILED " : a.op.padEnd(7)} ${a.plan.kind.padEnd(9)} ${a.plan.name} (${detail})`);
+  if (error) log(`          ${error}`);
 }
 
 const csvPath = path.join(outDir, `decisions_${stamp}.csv`);
@@ -84,5 +99,9 @@ await writeFile(csvPath, csv.join("\n") + "\n");
 await writeFile(path.join(outDir, `plan_${stamp}.json`), JSON.stringify(plans, (_, v) => (v instanceof Set ? [...v] : v), 2));
 log(`Decision log: ${csvPath}`);
 if (mode !== "apply") log("PREVIEW, nothing written to Immich. Run 'apply' to write.");
+if (failed) {
+  log(`FAILED on ${failed} album(s). The rest went through; the CSV has a message per failure.`);
+  process.exitCode = 1;
+}
 log("Done.");
 await writeFile(path.join(outDir, `run_${stamp}.log`), lines.join("\n") + "\n");

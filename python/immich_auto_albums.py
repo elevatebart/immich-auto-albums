@@ -65,7 +65,12 @@ def log(msg):
 
 
 # ---- API ----
-def api(method, path, body=None):
+class ApiError(Exception):
+    pass
+
+
+def api(method, path, body=None, fatal=True):
+    """Reads exit on failure, since nothing can be planned without them. Writes raise instead."""
     data = json.dumps(body).encode() if body is not None else None
     req = urllib.request.Request(
         f"{SERVER}/api{path}", data=data, method=method,
@@ -76,7 +81,10 @@ def api(method, path, body=None):
             raw = r.read()
             return json.loads(raw) if raw else None
     except urllib.error.HTTPError as e:
-        log(f"FATAL: HTTP {e.code} {method} {path}: {e.read().decode(errors='replace')[:300]}")
+        msg = f"HTTP {e.code} {method} {path}: {e.read().decode(errors='replace')[:300]}"
+        if not fatal:
+            raise ApiError(msg) from None
+        log(f"FATAL: {msg}")
         sys.exit(1)
 
 
@@ -378,36 +386,50 @@ def match_existing(plan, existing, used):
     return best if best_score >= 0.5 else None
 
 
+def write_album(plan, al, user_renamed, add, rem):
+    """One album's writes, raising ApiError so the run can carry on to the next album."""
+    if al is None:
+        api("POST", "/albums", {"albumName": plan["name"], "description": desc_for(plan),
+                                "assetIds": sorted(plan["ids"])}, fatal=False)
+        return
+    api("PATCH", f"/albums/{al['id']}", {"albumName": al["name"] if user_renamed else plan["name"],
+                                         "description": desc_for(plan)}, fatal=False)
+    if add:
+        api("PUT", f"/albums/{al['id']}/assets", {"ids": add}, fatal=False)
+    if rem:
+        api("DELETE", f"/albums/{al['id']}/assets", {"ids": rem}, fatal=False)
+
+
 def apply(plans, existing, writer):
     used = set()
+    failures = 0
     for plan in sorted(plans, key=lambda p: p["start"]):
         al = match_existing(plan, existing, used)
         ids = set(plan["ids"])
         if al is None:
-            writer.writerow([plan["kind"], "create", plan["name"], len(ids), ""])
-            log(f"  create  {plan['kind']:9} {plan['name']} ({len(ids)}) key={plan['key']}")
-            if not DRY_RUN:
-                api("POST", "/albums", {"albumName": plan["name"], "description": desc_for(plan), "assetIds": sorted(ids)})
-            continue
-        used.add(al["id"])
-        have = album_assets(al)
-        add, rem = sorted(ids - have), sorted(have - ids)
-        user_renamed = al["name"] != al["auto"]
-        rename = not user_renamed and al["name"] != plan["name"]
-        stale_desc = al["auto"] != plan["name"]
-        if not (add or rem or rename or stale_desc):
-            continue
-        op = "update" if (add or rem) else "rename"  # a rename moves no photos
-        detail = f"+{len(add)} -{len(rem)}" + (f", was: {al['name']}" if rename else "") + (", keeping your name" if user_renamed else "")
-        writer.writerow([plan["kind"], op, plan["name"], len(ids), detail])
-        log(f"  {op:7} {plan['kind']:9} {plan['name']} ({detail})")
-        if DRY_RUN:
-            continue
-        api("PATCH", f"/albums/{al['id']}", {"albumName": al["name"] if user_renamed else plan["name"], "description": desc_for(plan)})
-        if add:
-            api("PUT", f"/albums/{al['id']}/assets", {"ids": add})
-        if rem:
-            api("DELETE", f"/albums/{al['id']}/assets", {"ids": rem})
+            op, detail, add, rem, user_renamed = "create", f"key={plan['key']}", sorted(ids), [], False
+        else:
+            used.add(al["id"])
+            have = album_assets(al)
+            add, rem = sorted(ids - have), sorted(have - ids)
+            user_renamed = al["name"] != al["auto"]
+            rename = not user_renamed and al["name"] != plan["name"]
+            stale_desc = al["auto"] != plan["name"]
+            if not (add or rem or rename or stale_desc):
+                continue
+            op = "update" if (add or rem) else "rename"  # a rename moves no photos
+            detail = f"+{len(add)} -{len(rem)}" + (f", was: {al['name']}" if rename else "") + (", keeping your name" if user_renamed else "")
+        error = ""
+        if not DRY_RUN:
+            try:
+                write_album(plan, al, user_renamed, add, rem)
+            except ApiError as e:
+                error, failures = str(e), failures + 1
+        writer.writerow([plan["kind"], op, plan["name"], len(ids), detail, error])
+        log(f"  {'FAILED ' if error else op:7} {plan['kind']:9} {plan['name']} ({detail})")
+        if error:
+            log(f"          {error}")
+    return failures
 
 
 def main():
@@ -439,12 +461,16 @@ def main():
     csv_path = os.path.join(OUT, f"decisions_{STAMP}.csv")
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
-        w.writerow(["kind", "action", "album", "assets", "detail"])
-        apply(plans, existing, w)
+        w.writerow(["kind", "action", "album", "assets", "detail", "error"])
+        failures = apply(plans, existing, w)
     log(f"Decision log: {csv_path}")
     if DRY_RUN:
         log("DRY RUN, nothing written to Immich. Review the CSV, then set DRY_RUN=0.")
+    if failures:
+        log(f"FAILED on {failures} album(s). The rest went through; the CSV has a message per failure.")
     log("Done.")
+    if failures:
+        sys.exit(1)
 
 
 if __name__ == "__main__":

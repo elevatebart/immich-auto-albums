@@ -38,6 +38,7 @@
 	let warnings = $state<string[]>([]);
 	let error = $state<string | null>(null);
 	let note = $state<string | null>(null);
+	let result = $state<ApplyResponse | null>(null);
 	let busy = $state(false);
 	let scanning = $state(false);
 	let recomputing = $state(false);
@@ -146,6 +147,7 @@
 		busy = true;
 		error = null;
 		note = null;
+		result = null;
 		try {
 			const data = await api<ConfigWriteResponse>('/api/config', {
 				method: 'PUT',
@@ -174,13 +176,14 @@
 		if (!shown) return;
 		applying = true;
 		error = null;
+		result = null;
 		try {
 			const data = await api<ApplyResponse>('/api/apply', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ token: shown.token, confirm: true, ids: [...selected], scope })
 			});
-			note = `${data.dryRun ? 'Dry run, nothing written' : 'Written to Immich'}: ${data.applied} ok, ${data.failed} failed.`;
+			result = data;
 			await loadAlbums(true);
 		} catch (e) {
 			error = (e as Error).message;
@@ -332,6 +335,29 @@
 			{/each}
 			{#if note}
 				<Alert color="success" title="Done">{note}</Alert>
+			{/if}
+			{#if result}
+				<Alert
+					color={result.failed ? 'danger' : 'success'}
+					title={result.failed
+						? `${result.failed} album${result.failed > 1 ? 's' : ''} could not be written`
+						: result.dryRun
+							? 'Dry run, nothing written'
+							: 'Written to Immich'}
+				>
+					{result.applied} of {result.results.length} went through.
+					{#each result.results.filter((r) => !r.ok) as r (r.id)}
+						<div class="pt-1 text-sm">
+							<b>{r.name}</b>: {r.error}
+						</div>
+					{/each}
+					{#if result.failed}
+						<div class="pt-2 text-sm">
+							Nothing else changed. Fix the cause and apply again: the albums that went through show as
+							unchanged on the next rescan.
+						</div>
+					{/if}
+				</Alert>
 			{/if}
 
 			{#if shown}
