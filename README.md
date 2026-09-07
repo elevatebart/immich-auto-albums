@@ -17,6 +17,9 @@ UI: `cd server && DEMO=1 npm run dev` for the preview table, the apply confirm a
 
 `config.schema.json` is the JSON Schema for the config, generated with `npm run schema`.
 
+`python/immich_auto_albums.py` is the original single-file version, stdlib only, reading the same `config.toml`.
+See `python/README.md`.
+
 Layout: `src/planner.ts` (pure, no I/O), `src/reconcile.ts` (pure), `src/config.ts` (TOML -> Config),
 `src/schema.ts` + `src/validate.ts` (JSON Schema and Ajv validation),
 `src/immich.ts` (fetch client), `src/cli.ts`. `test/` holds the golden cases ported from the Python version.
