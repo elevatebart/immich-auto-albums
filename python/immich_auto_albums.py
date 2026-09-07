@@ -36,7 +36,8 @@ def load_config(path):
         NO_PEOPLE_PLACES=set(pe.get("no_people_places", [])),
         HOMES=[(h["from"], h["lat"], h["lon"]) for h in c["homes"]],
         HOME_KM=cl["home_km"], PLACE_KM=cl["place_km"], MERGE_LABEL_KM=cl["merge_label_km"],
-        DOMINANT_SHARE=cl["dominant_share"], TRIP_GAP_H=cl["trip_gap_hours"],
+        DOMINANT_SHARE=cl["dominant_share"], REGION_SHARE=cl.get("region_share", 0.8),
+        TRIP_GAP_H=cl["trip_gap_hours"],
         TRIP_MIN_PHOTOS=cl["trip_min_photos"], TRIP_MIN_DAYS=cl["trip_min_days"],
         DAYTRIP_MIN_PHOTOS=cl["daytrip_min_photos"], GATHER_GAP_H=cl["gather_gap_hours"],
         GATHER_MIN_PHOTOS=cl["gather_min_photos"], GATHER_MIN_GUESTS=cl["gather_min_guests"],
@@ -224,9 +225,13 @@ def place_name(cluster):
     top = places[0]["items"]
     if len(top) >= DOMINANT_SHARE * len(gps):
         return label(top) or label(top, "state") or label(top, "country") or "Trip"
-    states = {label(pl["items"], "state") for pl in places} - {None}
-    if len(states) == 1:
-        return states.pop()
+    # One region holding most of the photos names the trip on its own; the rest is a detour.
+    regions = Counter(norm_place(a["state"]) for a in gps)
+    regions.pop(None, None)
+    if regions:
+        region, n = regions.most_common(1)[0]
+        if n >= REGION_SHARE * len(gps):
+            return region
     countries = Counter(norm_place(a["country"]) for a in gps)
     countries.pop(None, None)
     if len(countries) == 1:

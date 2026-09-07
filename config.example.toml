@@ -32,6 +32,7 @@ home_km = 20              # photos within this radius of the current home are at
 place_km = 5              # groups photos around a running centroid before naming a place
 merge_label_km = 15       # merges nearby groups before picking the album name
 dominant_share = 0.75     # share of a trip's GPS photos one place needs to name the album
+region_share = 0.8        # share one region needs before the other regions are ignored in the name
 trip_gap_hours = 72       # a longer gap starts a new trip
 trip_min_photos = 10
 trip_min_days = 2         # fewer days and the cluster is considered for a day trip

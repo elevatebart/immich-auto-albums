@@ -52,6 +52,7 @@ export const configSchema = {
       placeKm: num(0.1, 500, "Groups photos around a running centroid before naming a place."),
       mergeLabelKm: num(0.1, 500, "Merges nearby place groups before picking the album name."),
       dominantShare: num(0, 1, "Share of a trip's GPS photos one place needs to name the album."),
+      regionShare: { ...num(0, 1, "Share one region needs before the other regions are ignored in the name."), default: 0.8 },
       tripGapHours: num(1, 8760, "A gap longer than this starts a new trip."),
       tripMinPhotos: int(1, 1000, "Minimum photos for a trip."),
       tripMinDays: int(1, 365, "Minimum distinct days for a trip. Below this it is considered a day trip."),

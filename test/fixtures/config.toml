@@ -51,6 +51,7 @@ home_km = 20
 place_km = 5
 merge_label_km = 15
 dominant_share = 0.75
+region_share = 0.8
 trip_gap_hours = 72
 trip_min_photos = 10
 trip_min_days = 2

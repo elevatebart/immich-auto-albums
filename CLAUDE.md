@@ -72,6 +72,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Comments and JSDoc at most 2 lines. No em dashes anywhere. Straight quotes.
 - Prefer small pure functions; no classes except the API client.
 - Names in albums are English; place names come from Immich's geocoder through `normPlace` (aliases in config).
+- Trip naming, in order: a place holding `dominant_share` of the GPS photos, else a region holding `region_share`
+  of them, else the one country, else the top two joined by " & ".
 
 ## Roadmap
 1. Done. `server/` holds the API key, exposes preview, apply, config, people, geocode and album assets. The UI has the

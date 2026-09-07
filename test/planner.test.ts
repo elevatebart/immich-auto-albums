@@ -112,6 +112,25 @@ describe("rule engines", () => {
     expect(taggedSince(ctx)).toBe(2025);
   });
 
+  it("names a trip after the region holding most of it", () => {
+    const ctx = makeContext(cfg, NOW, 9000);
+    const b = new Date(Date.UTC(2025, 5, 1));
+    const A = [
+      // 18 photos across two towns of one region, no town dominant enough to name it.
+      ...burst(b, 10, 6, (t) => mk(t, 45.05, 5.28, "Saint-Nazaire-en-Royans", "Auvergne-Rhône-Alpes", "France")),
+      ...burst(new Date(b.getTime() + 80 * H), 8, 6, (t) => mk(t, 45.9, 6.13, "Annecy", "Auvergne-Rhône-Alpes", "France")),
+      // 3 photos over the border on the way home: 86% of the trip is still AURA.
+      ...burst(new Date(b.getTime() + 140 * H), 3, 6, (t) => mk(t, 46.2, 6.14, "Genève", "Genève", "Switzerland")),
+    ];
+    expect(planTrips(ctx, A).map((p) => p.name)).toEqual(["Auvergne-Rhône-Alpes, Jun 2025"]);
+
+    // Drop the region share below the split and the old country pair comes back.
+    const loose = { ...cfg, clustering: { ...cfg.clustering, regionShare: 0.95 } };
+    expect(planTrips(makeContext(loose, NOW, 9000), A).map((p) => p.name)).toEqual([
+      "France & Switzerland, Jun 2025",
+    ]);
+  });
+
   it("fixed events, and a country name when no city is known", () => {
     const ctx = makeContext(cfg, NOW, 9000);
     const A = burst(new Date("2019-08-30T00:00:00Z"), 12, 7, (t) => mk(t, null, null, null));

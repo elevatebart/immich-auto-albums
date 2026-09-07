@@ -81,14 +81,16 @@ export function normPlace(cfg: Config, name: string | null): string | null {
   return cfg.aliases[name] ?? name;
 }
 
-function mostCommon(values: (string | null)[]): string | null {
+/** The most frequent non-null value with its count. */
+function commonest(values: (string | null)[]): [string, number] | null {
   const c = new Map<string, number>();
   for (const v of values) if (v) c.set(v, (c.get(v) ?? 0) + 1);
-  let best: string | null = null;
-  let n = 0;
-  for (const [k, v] of c) if (v > n) [best, n] = [k, v];
+  let best: [string, number] | null = null;
+  for (const [k, v] of c) if (!best || v > best[1]) best = [k, v];
   return best;
 }
+
+const mostCommon = (values: (string | null)[]): string | null => commonest(values)?.[0] ?? null;
 
 const label = (cfg: Config, items: Asset[], field: "city" | "state" | "country" = "city") =>
   mostCommon(items.map((a) => normPlace(cfg, a[field])));
@@ -108,8 +110,9 @@ export function placeName(cfg: Config, cluster: Asset[]): string {
   if (top.length >= cfg.clustering.dominantShare * gps.length) {
     return label(cfg, top) ?? label(cfg, top, "state") ?? label(cfg, top, "country") ?? "Trip";
   }
-  const states = new Set(places.map((p) => label(cfg, p.items, "state")).filter(Boolean));
-  if (states.size === 1) return [...states][0]!;
+  // One region holding most of the photos names the trip on its own; the rest is a detour.
+  const region = commonest(gps.map((a) => normPlace(cfg, a.state)));
+  if (region && region[1] >= cfg.clustering.regionShare * gps.length) return region[0];
   const countries = new Map<string, number>();
   for (const a of gps) {
     const c = normPlace(cfg, a.country);

@@ -158,6 +158,13 @@
           "maximum": 1,
           "description": "Share of a trip's GPS photos one place needs to name the album."
         },
+        "regionShare": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Share one region needs before the other regions are ignored in the name.",
+          "default": 0.8
+        },
         "tripGapHours": {
           "type": "number",
           "minimum": 1,

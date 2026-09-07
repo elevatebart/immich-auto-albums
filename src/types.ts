@@ -39,6 +39,7 @@ export interface Config {
     placeKm: number;
     mergeLabelKm: number;
     dominantShare: number;
+    regionShare: number;
     tripGapHours: number;
     tripMinPhotos: number;
     tripMinDays: number;
