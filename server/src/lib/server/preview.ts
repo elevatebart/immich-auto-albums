@@ -50,6 +50,8 @@ interface Snapshot {
 	assets: Asset[];
 	albums: ManagedAlbum[];
 	people: number;
+	/** Frozen so a re-plan of the same library lands on the same window. */
+	now: Date;
 }
 
 export function immichClient(cfg: Config): ImmichClient {
@@ -73,14 +75,15 @@ async function fromImmich(cfg: Config, now: Date, windowDays: number): Promise<S
 		source: 'immich',
 		assets: [...assets.values()],
 		albums: await client.fetchManagedAlbums(cfg.immich.marker),
-		people: people.length
+		people: people.length,
+		now
 	};
 }
 
 function fromFixture(cfg: Config, now: Date): Snapshot {
 	const assets = fixtureAssets(now, cfg);
 	const names = new Set(assets.flatMap((a) => [...a.people]));
-	return { source: 'fixture', assets, albums: fixtureAlbums(cfg, assets, now), people: names.size };
+	return { source: 'fixture', assets, albums: fixtureAlbums(cfg, assets, now), people: names.size, now };
 }
 
 export const rowId = (a: Action) => `${a.plan.kind}:${a.plan.key}`;
@@ -109,15 +112,21 @@ const tokenOf = (rows: PreviewRow[]) =>
 		.digest('hex')
 		.slice(0, 16);
 
-async function compute(): Promise<Computed> {
-	const cfg = await readConfig();
+async function readSnapshot(cfg: Config): Promise<Snapshot> {
 	const now = new Date();
-	const windowDays = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
 	if (!env.IMMICH_API_KEY && env.DEMO !== '1') {
 		throw new PreviewError(503, 'IMMICH_API_KEY is not set. Set it, or run with DEMO=1 for the fixture library.');
 	}
-	const snap = env.IMMICH_API_KEY ? await fromImmich(cfg, now, windowDays) : fromFixture(cfg, now);
+	const windowDays = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
+	return env.IMMICH_API_KEY ? await fromImmich(cfg, now, windowDays) : fromFixture(cfg, now);
+}
 
+/** Plan and reconcile over a snapshot already in memory. Microseconds, so a draft config is cheap. */
+function planWith(snapshot: Snapshot, cfg: Config, draft: boolean): Computed {
+	// The fixture reads the config, so rebuild it for a draft rather than showing stale names.
+	const snap = snapshot.source === 'fixture' ? fromFixture(cfg, snapshot.now) : snapshot;
+	const now = snap.now;
+	const windowDays = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
 	const { plans, absorbed } = plan(cfg, snap.assets, { now, windowDays });
 	const actions = reconcile(plans, snap.albums);
 	const rows = actions.map(rowOf);
@@ -130,7 +139,9 @@ async function compute(): Promise<Computed> {
 			generatedAt: now.toISOString(),
 			source: snap.source,
 			windowStart: dayOf(makeContext(cfg, now, windowDays).windowStart),
-			token: tokenOf(rows),
+			// Only a plan from the saved config can be applied, so a draft carries no token.
+			token: draft ? '' : tokenOf(rows),
+			draft,
 			stats: {
 				assets: snap.assets.length,
 				withGps: snap.assets.filter((a) => a.lat !== null).length,
@@ -146,13 +157,14 @@ async function compute(): Promise<Computed> {
 	};
 }
 
-let cached: { at: number; value: Computed } | null = null;
-let inflight: Promise<Computed> | null = null;
+let cached: { at: number; value: Snapshot } | null = null;
+let inflight: Promise<Snapshot> | null = null;
 
-/** A full library scan is slow, so hold the last result and coalesce concurrent requests. */
-export function getComputed(refresh = false): Promise<Computed> {
-	if (!refresh && cached && Date.now() - cached.at < TTL_MS) return Promise.resolve(cached.value);
-	inflight ??= compute()
+/** A full library scan is slow, so hold the last one and coalesce concurrent requests. */
+async function getSnapshot(refresh = false): Promise<Snapshot> {
+	if (!refresh && cached && Date.now() - cached.at < TTL_MS) return cached.value;
+	inflight ??= readConfig()
+		.then(readSnapshot)
 		.then((value) => {
 			cached = { at: Date.now(), value };
 			return value;
@@ -161,6 +173,17 @@ export function getComputed(refresh = false): Promise<Computed> {
 			inflight = null;
 		});
 	return inflight;
+}
+
+/** The plan for the config on disk. This is the only one apply will write. */
+export async function getComputed(refresh = false): Promise<Computed> {
+	const cfg = await readConfig();
+	return planWith(await getSnapshot(refresh), cfg, false);
+}
+
+/** The plan for an unsaved config, over the cached library. */
+export async function getDraft(cfg: Config): Promise<Computed> {
+	return planWith(await getSnapshot(), cfg, true);
 }
 
 export const getPreview = (refresh = false) => getComputed(refresh).then((c) => c.data);

@@ -17,7 +17,10 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
 
 - `GET /api/preview` -> `Preview` (`src/lib/types.ts`): stats plus one row per reconcile action,
   with the create/update/noop op, rename flags, asset counts and the cluster centroid. Asset ids stay
-  on the server. `?refresh=1` bypasses the 10 minute cache.
+  on the server. `?refresh=1` rescans the library, which is the only slow part and is cached for 10 minutes.
+- `POST /api/preview` with `{ config }` -> the same shape for an unsaved config, planned over the cached
+  library in a few milliseconds. It carries `draft: true` and no token, so apply can never write a plan
+  that came from a config the file does not have.
 - `POST /api/apply` -> `ApplyResponse`. Body: `{ token, confirm: true, ids? }`. The token is the digest of the
   preview rows, so a plan that moved since the caller looked at it is rejected with 409 rather than written blind;
   a missing `confirm` is 400. `ids` narrows the write to those rows, omitted means every changed row. One failed
@@ -30,13 +33,16 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   writing. A write copies the old file to `config.toml.bak`, writes through a temp file in the same directory, then
   renames, and drops the preview cache. `warnings` covers legal but costly edits, such as a new marker orphaning
   the albums tagged with the old one.
-- `/`: the preview table, with kind filter, unchanged-rows toggle, per-row checkboxes and a confirm modal that
-  spells out the counts before anything is written. Above it, a Leaflet map of the cluster centroids: one circle per
-  located row, sized by photo count, coloured like the op badge. Clicking a circle highlights its row and clicking a
-  row pans to its circle. The map follows the table filters, so it only ever shows the rows on screen.
-- `/config`: the config form. Sliders for everything numeric, `MultiSelect` of Immich people for the household, a
-  Leaflet map with draggable pins for the homes, native date inputs for the quiet period and the fixed events, and
-  row editors for aliases, events and overrides. Check file renders the TOML through the dry run; Save writes it.
+- `/` is the whole app: config handles on the left, the albums they produce on the right. `/config` redirects here.
+  Left (`ConfigPanel.svelte`): sliders for everything numeric, `MultiSelect` of Immich people for the household, a
+  Leaflet map with draggable pins for the homes, native date inputs for the quiet period and the fixed events, row
+  editors for aliases, events and overrides, and the rendered TOML. Check file renders it through the dry run; Save
+  writes it.
+  Right (`AlbumsPanel.svelte`): the planned albums with create, update, rename, kept-name and unchanged badges, a
+  kind filter, an unchanged-rows toggle, and a Leaflet map of the cluster centroids sized by photo count and coloured
+  like the badges. Clicking a circle highlights its row, clicking a row pans to its circle.
+  Move any handle and the right panel replans 400 ms later from the draft, without saving. Apply stays disabled until
+  the config on screen matches the file, so what gets written is always what a scheduled run would write.
 
 `$core` is an alias for `../src`, so the pure `planner.ts`, `reconcile.ts` and `config.ts` are imported
 as source and bundled by Vite. No copy, no build step in the parent.

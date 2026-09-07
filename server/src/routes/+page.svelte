@@ -1,90 +1,61 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
-	import { mdiCloudUploadOutline, mdiMapMarkerOutline, mdiRefresh } from '@mdi/js';
 	import {
-		Alert,
-		Badge,
-		Button,
-		Card,
-		CardBody,
-		Checkbox,
-		ConfirmModal,
-		HStack,
-		Heading,
-		Icon,
-		Link,
-		Select,
-		Stack,
-		Text
-	} from '@immich/ui';
-	import CentroidsMap from '$lib/components/CentroidsMap.svelte';
-	import type { ApplyResponse, Preview, PreviewRow } from '$lib/types';
+		mdiCloudUploadOutline,
+		mdiContentSave,
+		mdiFileDocumentOutline,
+		mdiRefresh
+	} from '@mdi/js';
+	import { Alert, Button, ConfirmModal, HStack, Heading, Stack, Text } from '@immich/ui';
+	import type { ConfigIssue } from '$core/schema.js';
+	import type { Config } from '$core/types.js';
+	import AlbumsPanel from '$lib/components/AlbumsPanel.svelte';
+	import ConfigPanel from '$lib/components/ConfigPanel.svelte';
+	import type {
+		ApplyResponse,
+		ConfigResponse,
+		ConfigWriteResponse,
+		PeopleResponse,
+		Person,
+		Preview
+	} from '$lib/types';
 
-	let preview = $state<Preview | null>(null);
-	let error = $state<string | null>(null);
-	let loading = $state(true);
-	let hideNoop = $state(true);
-	let kind = $state('all');
+	let config = $state<Config | null>(null);
+	let aliasRows = $state<{ from: string; to: string }[]>([]);
+	let etag = $state('');
+	let file = $state('');
+	let pristine = $state('');
+	let toml = $state('');
+	let people = $state<Person[]>([]);
+	let peopleNote = $state('');
+
+	let saved = $state<Preview | null>(null);
+	let shown = $state<Preview | null>(null);
 	let selected = $state(new SvelteSet<string>());
-	let confirming = $state(false);
+
+	let issues = $state<ConfigIssue[]>([]);
+	let warnings = $state<string[]>([]);
+	let error = $state<string | null>(null);
+	let note = $state<string | null>(null);
+	let busy = $state(false);
+	let scanning = $state(false);
+	let recomputing = $state(false);
 	let applying = $state(false);
-	let result = $state<ApplyResponse | null>(null);
-	let focused = $state<string | undefined>(undefined);
+	let confirming = $state(false);
 
-	async function load(refresh = false) {
-		loading = true;
-		error = null;
-		try {
-			const res = await fetch(`/api/preview${refresh ? '?refresh=1' : ''}`);
-			const body = await res.json();
-			if (!res.ok) throw new Error(body.error ?? res.statusText);
-			preview = body as Preview;
-			selected = new SvelteSet(changed(preview).map((r) => r.id));
-			confirming = false;
-		} catch (e) {
-			error = (e as Error).message;
-		} finally {
-			loading = false;
-		}
-	}
+	const payload = () =>
+		config && {
+			...config,
+			aliases: Object.fromEntries(
+				aliasRows.filter((r) => r.from.trim()).map((r) => [r.from.trim(), r.to])
+			)
+		};
 
-	/** Sends the token of the preview on screen, so a plan that moved underneath is rejected. */
-	async function apply() {
-		if (!preview) return;
-		applying = true;
-		error = null;
-		try {
-			const res = await fetch('/api/apply', {
-				method: 'POST',
-				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ token: preview.token, confirm: true, ids: [...selected] })
-			});
-			const body = await res.json();
-			if (!res.ok) throw new Error(body.error ?? res.statusText);
-			result = body as ApplyResponse;
-			await load(true);
-		} catch (e) {
-			error = (e as Error).message;
-		} finally {
-			applying = false;
-		}
-	}
-
-	onMount(() => load());
-
-	const changed = (p: Preview) => p.rows.filter((r) => r.op !== 'noop');
-	const toggle = (id: string) => (selected.has(id) ? selected.delete(id) : selected.add(id));
-
-	const kinds = $derived(['all', ...new Set((preview?.rows ?? []).map((r) => r.kind))].sort());
-	const rows = $derived(
-		[...(preview?.rows ?? [])]
-			.filter((r) => (hideNoop ? r.op !== 'noop' : true))
-			.filter((r) => kind === 'all' || r.kind === kind)
-			.sort((a, b) => b.start.localeCompare(a.start))
-	);
-
-	const chosen = $derived((preview ? changed(preview) : []).filter((r) => selected.has(r.id)));
+	const dirty = $derived(!!config && JSON.stringify(payload()) !== pristine);
+	const changed = $derived((shown?.rows ?? []).filter((r) => r.op !== 'noop'));
+	const canApply = $derived(!!shown && !shown.draft && !dirty);
+	const chosen = $derived(changed.filter((r) => selected.has(r.id)));
 	const summary = $derived({
 		create: chosen.filter((r) => r.op === 'create').length,
 		update: chosen.filter((r) => r.op === 'update').length,
@@ -92,176 +63,277 @@
 		remove: chosen.reduce((s, r) => s + r.remove, 0)
 	});
 
-	/** A click on the map scrolls its row into view. */
-	$effect(() => {
-		if (focused) document.getElementById(`row-${focused}`)?.scrollIntoView({ block: 'nearest' });
+	async function api<T>(url: string, init?: RequestInit): Promise<T> {
+		const res = await fetch(url, init);
+		const body = await res.json();
+		if (res.status === 400 && body.issues) {
+			issues = body.issues;
+			throw new Error(body.error);
+		}
+		if (!res.ok) throw new Error(body.error ?? res.statusText);
+		return body as T;
+	}
+
+	async function loadConfig() {
+		busy = true;
+		error = null;
+		try {
+			const data = await api<ConfigResponse>('/api/config');
+			config = data.config;
+			aliasRows = Object.entries(data.config.aliases).map(([from, to]) => ({ from, to }));
+			etag = data.etag;
+			file = data.file;
+			toml = data.toml;
+			issues = [];
+			warnings = [];
+			pristine = JSON.stringify(payload());
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function loadAlbums(refresh = false) {
+		scanning = true;
+		error = null;
+		try {
+			saved = await api<Preview>(`/api/preview${refresh ? '?refresh=1' : ''}`);
+			if (!dirty) select(saved);
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			scanning = false;
+		}
+	}
+
+	async function loadPeople() {
+		try {
+			const data = await api<PeopleResponse>('/api/people');
+			people = data.people;
+			peopleNote =
+				data.source === 'fixture'
+					? 'names from the fixture library'
+					: `${data.people.length} named people in Immich`;
+		} catch (e) {
+			peopleNote = `people list unavailable: ${(e as Error).message}`;
+		}
+	}
+
+	/** Plans the unsaved config over the cached library, so the right panel follows the handles. */
+	async function loadDraft(body: unknown) {
+		recomputing = true;
+		try {
+			shown = await api<Preview>('/api/preview', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ config: body })
+			});
+			issues = [];
+			error = null;
+			selected.clear();
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			recomputing = false;
+		}
+	}
+
+	async function saveConfig(dryRun: boolean) {
+		busy = true;
+		error = null;
+		note = null;
+		try {
+			const data = await api<ConfigWriteResponse>('/api/config', {
+				method: 'PUT',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ etag, config: payload(), dryRun })
+			});
+			issues = [];
+			warnings = data.warnings;
+			toml = data.toml;
+			if (!dryRun) {
+				config = data.config;
+				aliasRows = Object.entries(data.config.aliases).map(([from, to]) => ({ from, to }));
+				etag = data.etag;
+				pristine = JSON.stringify(payload());
+				note = `Written to ${data.file}, previous file kept at ${data.backup}.`;
+				await loadAlbums();
+			}
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			busy = false;
+		}
+	}
+
+	async function apply() {
+		if (!shown) return;
+		applying = true;
+		error = null;
+		try {
+			const data = await api<ApplyResponse>('/api/apply', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ token: shown.token, confirm: true, ids: [...selected] })
+			});
+			note = `${data.dryRun ? 'Dry run, nothing written' : 'Written to Immich'}: ${data.applied} ok, ${data.failed} failed.`;
+			await loadAlbums(true);
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			applying = false;
+		}
+	}
+
+	const select = (p: Preview) =>
+		(selected = new SvelteSet(p.rows.filter((r) => r.op !== 'noop').map((r) => r.id)));
+
+	onMount(() => {
+		loadConfig().then(() => loadAlbums());
+		loadPeople();
 	});
 
-	const delta = (r: PreviewRow) =>
-		[r.add ? `+${r.add}` : '', r.remove ? `-${r.remove}` : ''].filter(Boolean).join(' ') || '-';
-	const osm = (c: { lat: number; lon: number }) =>
-		`https://www.openstreetmap.org/?mlat=${c.lat}&mlon=${c.lon}#map=9/${c.lat}/${c.lon}`;
-	const opColor = (op: PreviewRow['op']) =>
-		op === 'create' ? 'success' : op === 'update' ? 'warning' : 'secondary';
+	/** Every handle move lands here: same config, show the saved plan; changed, debounce a draft. */
+	$effect(() => {
+		const body = payload();
+		const json = JSON.stringify(body);
+		if (!body || !saved) return;
+		if (json === pristine) {
+			shown = saved;
+			select(saved);
+			return;
+		}
+		const timer = setTimeout(() => loadDraft(body), 400);
+		return () => clearTimeout(timer);
+	});
 </script>
 
-<svelte:head><title>immich-auto-albums preview</title></svelte:head>
+<svelte:head><title>immich-auto-albums</title></svelte:head>
 
-<Stack gap={4}>
-	<HStack class="justify-between">
-		<Stack gap={0}>
-			<Heading size="large">Album preview</Heading>
-			{#if preview}
-				<Text color="muted" size="small">
-					{preview.stats.assets} assets ({preview.stats.withGps} with GPS), {preview.stats.people}
-					named people, {preview.stats.managedAlbums} managed albums, {preview.stats.absorbed}
-					GPS-less photos absorbed into trips. Window since {preview.windowStart}.
-					{#if preview.source === 'fixture'}
-						<Badge color="secondary" size="small">fixture library</Badge>
+<div class="grid gap-5 lg:h-[calc(100vh-7.5rem)] lg:grid-cols-[minmax(26rem,42%)_1fr]">
+	<section class="flex min-h-0 flex-col gap-3">
+		<HStack class="justify-between">
+			<Stack gap={0}>
+				<Heading size="small">Configuration</Heading>
+				<Text color="muted" size="tiny">{file || 'config.toml'}</Text>
+			</Stack>
+			<HStack gap={2}>
+				<Button
+					variant="outline"
+					size="tiny"
+					leadingIcon={mdiRefresh}
+					onclick={loadConfig}
+					disabled={busy}
+				>
+					Reload
+				</Button>
+				<Button
+					variant="outline"
+					size="tiny"
+					leadingIcon={mdiFileDocumentOutline}
+					onclick={() => saveConfig(true)}
+					disabled={busy || !config}
+				>
+					Check file
+				</Button>
+				<Button
+					size="tiny"
+					leadingIcon={mdiContentSave}
+					onclick={() => saveConfig(false)}
+					disabled={busy || !dirty}
+				>
+					{dirty ? 'Save' : 'Saved'}
+				</Button>
+			</HStack>
+		</HStack>
+
+		<div class="min-h-0 flex-1 overflow-y-auto pe-1 lg:pb-2">
+			{#if config}
+				<ConfigPanel bind:config bind:aliasRows {issues} {people} {peopleNote} {toml} />
+			{:else if busy}
+				<Text color="muted">Reading config.toml...</Text>
+			{/if}
+		</div>
+	</section>
+
+	<section class="flex min-h-0 flex-col gap-3">
+		<HStack class="justify-between">
+			<Stack gap={0}>
+				<Heading size="small">Albums</Heading>
+				<Text color="muted" size="tiny">
+					{#if recomputing}
+						replanning...
+					{:else if shown?.draft}
+						from the unsaved config, save to apply
+					{:else if scanning}
+						scanning the library...
+					{:else}
+						{changed.length} to write, from the saved config
 					{/if}
 				</Text>
-			{/if}
-		</Stack>
-		<HStack gap={2}>
-			<Button
-				variant="outline"
-				size="small"
-				leadingIcon={mdiRefresh}
-				onclick={() => load(true)}
-				disabled={loading || applying}
-			>
-				{loading ? 'Scanning...' : 'Rescan'}
-			</Button>
-			<Button
-				size="small"
-				leadingIcon={mdiCloudUploadOutline}
-				onclick={() => (confirming = true)}
-				disabled={loading || applying || !chosen.length}
-			>
-				Apply {chosen.length} selected
-			</Button>
+			</Stack>
+			<HStack gap={2}>
+				<Button
+					variant="outline"
+					size="tiny"
+					leadingIcon={mdiRefresh}
+					onclick={() => loadAlbums(true)}
+					disabled={scanning || applying}
+				>
+					{scanning ? 'Scanning...' : 'Rescan'}
+				</Button>
+				<Button
+					size="tiny"
+					leadingIcon={mdiCloudUploadOutline}
+					onclick={() => (confirming = true)}
+					disabled={!canApply || applying || !chosen.length}
+					title={canApply ? '' : 'Save the config first'}
+				>
+					Apply {chosen.length}
+				</Button>
+			</HStack>
 		</HStack>
-	</HStack>
 
-	{#if error}
-		<Alert color="danger" title="Nothing was written">{error}</Alert>
-	{/if}
-
-	{#if result}
-		<Alert
-			color={result.failed ? 'warning' : 'success'}
-			title={result.dryRun ? 'Dry run, nothing written' : 'Written to Immich'}
-		>
-			{result.applied} ok, {result.failed} failed.
-			{#each result.results.filter((r) => !r.ok) as r (r.id)}
-				<div class="text-sm">{r.name}: {r.error}</div>
+		<div class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto lg:pb-2">
+			{#if error}
+				<Alert color="danger" title="Nothing was written">
+					{error}
+					{#if issues.length}
+						<ul class="mt-1 list-inside list-disc">
+							{#each issues as i (i.field)}<li>{i.field}: {i.message}</li>{/each}
+						</ul>
+					{/if}
+				</Alert>
+			{/if}
+			{#each warnings as w (w)}
+				<Alert color="warning" title="Worth a second look">{w}</Alert>
 			{/each}
-		</Alert>
-	{/if}
+			{#if note}
+				<Alert color="success" title="Done">{note}</Alert>
+			{/if}
 
-	{#if preview}
-		<Card>
-			<CardBody>
-				<Stack gap={3}>
-					<HStack gap={4} class="flex-wrap">
-						<HStack gap={2}>
-							<Checkbox id="hide-noop" bind:checked={hideNoop} size="small" />
-							<Text size="small" onclick={() => (hideNoop = !hideNoop)}>hide unchanged</Text>
-						</HStack>
-						<Select bind:value={kind} options={kinds} size="small" class="w-44" />
-						<Text color="muted" size="small">
-							{rows.length} of {preview.rows.length} rows, {preview.stats.create} to create,
-							{preview.stats.update} to update, {preview.stats.noop} unchanged
-						</Text>
-					</HStack>
+			{#if shown}
+				<div class:opacity-60={recomputing}>
+					<AlbumsPanel preview={shown} {selected} {canApply} />
+				</div>
+			{:else if scanning}
+				<Text color="muted">
+					Scanning the library. A first run over a large library takes a while.
+				</Text>
+			{/if}
+		</div>
+	</section>
+</div>
 
-					<CentroidsMap {rows} bind:focused />
-
-					<div class="overflow-x-auto">
-						<table class="w-full text-sm">
-							<thead class="text-primary">
-								<tr class="border-subtle border-b text-left">
-									<th class="w-8 py-2"></th>
-									<th class="py-2 pe-3 font-medium">Start</th>
-									<th class="py-2 pe-3 font-medium">Kind</th>
-									<th class="py-2 pe-3 font-medium">Album</th>
-									<th class="py-2 pe-3 font-medium">Change</th>
-									<th class="py-2 pe-3 text-right font-medium">Assets</th>
-									<th class="py-2 pe-3 text-right font-medium">Delta</th>
-									<th class="py-2 font-medium">Centroid</th>
-								</tr>
-							</thead>
-							<tbody>
-								{#each rows as r (r.id)}
-									<tr
-										id="row-{r.id}"
-										class="border-subtle border-b align-top"
-										class:bg-primary-50={focused === r.id}
-										onclick={() => (focused = r.id)}
-									>
-										<td class="py-2">
-											{#if r.op !== 'noop'}
-												<Checkbox
-													checked={selected.has(r.id)}
-													onCheckedChange={() => toggle(r.id)}
-													size="small"
-													aria-label="apply {r.name}"
-												/>
-											{/if}
-										</td>
-										<td class="py-2 pe-3 font-mono whitespace-nowrap">{r.start}</td>
-										<td class="py-2 pe-3">{r.kind}</td>
-										<td class="py-2 pe-3">
-											{r.userRenamed ? r.albumName : r.name}
-											{#if r.userRenamed}
-												<Text color="muted" size="tiny">auto: {r.name}</Text>
-											{/if}
-											{#if r.rename}
-												<Text color="muted" size="tiny">was: {r.albumName}</Text>
-											{/if}
-										</td>
-										<td class="py-2 pe-3">
-											<HStack gap={1} class="flex-wrap">
-												<Badge color={opColor(r.op)} size="small">{r.op}</Badge>
-												{#if r.rename}<Badge color="info" size="small">rename</Badge>{/if}
-												{#if r.userRenamed}<Badge color="primary" size="small">your name</Badge>{/if}
-											</HStack>
-										</td>
-										<td class="py-2 pe-3 text-right font-mono">{r.assets}</td>
-										<td class="py-2 pe-3 text-right font-mono">{delta(r)}</td>
-										<td class="py-2 font-mono whitespace-nowrap">
-											{#if r.centroid}
-												<Link href={osm(r.centroid)} target="_blank" rel="noreferrer">
-													<HStack gap={1}>
-														<Icon icon={mdiMapMarkerOutline} size="1em" />
-														{r.centroid.lat.toFixed(3)}, {r.centroid.lon.toFixed(3)}
-													</HStack>
-												</Link>
-											{:else}
-												<Text color="muted">-</Text>
-											{/if}
-										</td>
-									</tr>
-								{/each}
-							</tbody>
-						</table>
-					</div>
-				</Stack>
-			</CardBody>
-		</Card>
-	{:else if loading}
-		<Text color="muted">Scanning the library. A first run over a large library takes a while.</Text>
-	{/if}
-</Stack>
-
-{#if confirming && preview}
+{#if confirming && shown}
 	<ConfirmModal
 		title="Write to Immich?"
 		confirmText={applying ? 'Applying...' : 'Confirm and write'}
 		confirmColor="primary"
 		disabled={applying}
 		prompt={`${summary.create} albums created, ${summary.update} updated, ${summary.add} photos added, ${summary.remove} removed. ${
-			preview.source === 'fixture'
+			shown.source === 'fixture'
 				? 'The fixture library has no Immich behind it, so this runs as a dry run.'
 				: 'Only albums carrying the marker are touched, and album names you changed by hand are kept.'
 		}`}

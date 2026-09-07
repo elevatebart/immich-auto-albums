@@ -16,8 +16,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `src/cli.ts`: `preview` and `apply`. Writes `run_*.log`, `decisions_*.csv`, `plan_*.json` to `out_dir`.
 - `server/`: SvelteKit UI, `@immich/ui` components on Tailwind 4 so it matches Immich. Imports `src/` through the
   `$core` alias (`server/vite.config.ts`). `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire
-  types. Routes: `GET /api/preview`, `POST /api/apply`, `GET`/`PUT /api/config`, `GET /api/people`. Pages: `/` preview
-  table, `/config` form. Apply needs the preview token plus `confirm: true`, and
+  types. Routes: `GET`/`POST /api/preview` (saved config, draft config), `POST /api/apply`, `GET`/`PUT /api/config`,
+  `GET /api/people`. One page, `/`: handles left, albums right. A draft preview carries no token, so only a plan from
+  the saved config can be applied. Apply needs the preview token plus `confirm: true`, and
   `apply.ts` is the only path that mutates Immich. Config writes need the file etag, are validated field by field in
   `config-io.ts`, keep a `.bak` and swap through a temp file. `DEMO=1` swaps in a fixture library, apply then dry runs.
 - `test/planner.test.ts`: golden cases. Run `npm test` before and after any planner change. Tests read

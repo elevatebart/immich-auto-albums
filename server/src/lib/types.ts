@@ -40,6 +40,8 @@ export interface Preview {
 	windowStart: string;
 	/** Digest of the rows. POST /api/apply refuses a token that is not the current one. */
 	token: string;
+	/** True when this came from an unsaved config, which apply refuses. */
+	draft: boolean;
 	stats: PreviewStats;
 	rows: PreviewRow[];
 }
