@@ -20,6 +20,6 @@ export default defineConfig({
 			alias: { $core: '../src' }
 		})
 	],
-	// $core resolves above the SvelteKit root, so let the dev server read it.
-	server: { fs: { allow: ['..'] } }
+	// 5173 is usually taken here. $core resolves above the SvelteKit root, so let the dev server read it.
+	server: { port: 5678, strictPort: true, fs: { allow: ['..'] } }
 });

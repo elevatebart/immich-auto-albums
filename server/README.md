@@ -3,7 +3,7 @@
 SvelteKit UI for the planner. Roadmap item 1, first slice: read-only preview.
 
     cd server && npm install
-    IMMICH_API_KEY=... npm run dev        # http://localhost:5173
+    IMMICH_API_KEY=... npm run dev        # http://localhost:5678
     DEMO=1 npm run dev                   # no Immich needed, fixture library
 
 `config.toml` is gitignored, so copy `config.example.toml` first. Every route answers 404 with that hint when it is
