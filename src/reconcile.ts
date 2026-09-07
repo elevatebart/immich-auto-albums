@@ -6,19 +6,18 @@ const DAY = 86_400_000;
 export const descriptionFor = (marker: string, plan: Plan) =>
   `${marker} kind=${plan.kind} key=${plan.key}\nauto: ${plan.name}`;
 
-/** Parse an album description; returns null when the album is not managed. */
+/**
+ * Parse an album description; returns null when the album is not managed.
+ * `key` runs to the end of the line, since a person or event key holds a name with spaces in it.
+ */
 export function parseDescription(marker: string, albumName: string, description: string | null | undefined) {
   if (!description?.startsWith(marker)) return null;
   const [head, ...rest] = description.split("\n");
-  const meta: Record<string, string> = {};
-  for (const kv of head.slice(marker.length).trim().split(/\s+/)) {
-    const i = kv.indexOf("=");
-    if (i > 0) meta[kv.slice(0, i)] = kv.slice(i + 1);
-  }
+  const meta = head.slice(marker.length);
   const tail = rest.join("\n");
   return {
-    kind: (meta.kind as PlanKind | undefined) ?? null,
-    key: meta.key ?? null,
+    kind: (/\bkind=(\S+)/.exec(meta)?.[1] as PlanKind | undefined) ?? null,
+    key: /\bkey=(.*)$/.exec(meta)?.[1].trim() || null,
     auto: tail.startsWith("auto: ") ? tail.slice(6) : albumName,
   };
 }

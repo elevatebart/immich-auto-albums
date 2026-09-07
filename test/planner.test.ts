@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fromToml } from "../src/config.js";
 import { plan, planFixedEvents, planTrips, makeContext, taggedSince, yearsCovered } from "../src/planner.js";
-import { reconcile } from "../src/reconcile.js";
+import { descriptionFor, parseDescription, reconcile } from "../src/reconcile.js";
 import type { Asset, ManagedAlbum } from "../src/types.js";
 
 const cfg = fromToml(readFileSync(new URL("./fixtures/config.toml", import.meta.url), "utf8"));
@@ -124,6 +124,39 @@ describe("rule engines", () => {
 });
 
 describe("reconcile", () => {
+  it("round trips a key that holds a name with spaces", () => {
+    const marker = cfg.immich.marker;
+    for (const [kind, key] of [
+      ["person", "Nadia Rivers:2026"],
+      ["event", "Our wedding:2019-08-30"],
+      ["season", "Summer:2004"],
+      ["trip", "2026-08-08"],
+    ] as const) {
+      const desc = descriptionFor(marker, { kind, key, name: "Album", ids: [], start: NOW });
+      expect(parseDescription(marker, "Album", desc)).toEqual({ kind, key, auto: "Album" });
+    }
+    expect(parseDescription(marker, "Album", "someone else's album")).toBeNull();
+  });
+
+  it("matches a person album by its key rather than recreating it", () => {
+    const A = burst(new Date("2026-02-01T00:00:00Z"), 12, 24 * 7, (t) =>
+      mk(t, 45.19, 5.72, "Grenoble", null, "France", ["Nadia Rivers"]),
+    );
+    const { plans } = plan(cfg, A, { now: NOW });
+    const person = plans.find((p) => p.kind === "person")!;
+    const desc = descriptionFor(cfg.immich.marker, person);
+    const meta = parseDescription(cfg.immich.marker, person.name, desc)!;
+    const album: ManagedAlbum = {
+      id: "p1",
+      name: person.name,
+      auto: meta.auto,
+      kind: meta.kind,
+      key: meta.key,
+      assets: new Set(person.ids),
+    };
+    expect(reconcile([person], [album])[0].op).toBe("noop");
+  });
+
   it("keeps a user rename, renames its own, matches by overlap", () => {
     const b = new Date("2026-08-10T10:00:00Z");
     const A = burst(b, 12, 6, (t) => mk(t, 45.9, 6.13, "Annecy"));

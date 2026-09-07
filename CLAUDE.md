@@ -44,6 +44,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `Asset.t` encodes Immich `localDateTime` as a UTC-labelled Date; use `getUTC*` accessors only. Never introduce a tz library.
 - One source of truth for config bounds: the schema. Ranges, hints and defaults come from it, never hardcoded in a
   form or a second validator.
+- Description line 1 is `<marker> kind=<kind> key=<key>`, and `key=` must stay last on it: a person key is
+  `<full name>:<year>` and an event key is `<name>:<from>`, both of which contain spaces, so the parser reads the key
+  to the end of the line.
 - Only albums whose description starts with the marker are ever touched. Description line 2 is `auto: <generated name>`;
   when album name != auto name the user renamed it and the name is preserved. Renaming in Immich is the only way to
   override a generated name: there is no config key for it.

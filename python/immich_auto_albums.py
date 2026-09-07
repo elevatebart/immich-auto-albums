@@ -338,10 +338,15 @@ def load_auto_albums():
         if not d.startswith(MARKER):
             continue
         head, _, tail = d.partition("\n")
-        meta = dict(kv.split("=", 1) for kv in head[len(MARKER):].split() if "=" in kv)
+        # key runs to the end of the line: a person or event key holds a name with spaces in it.
+        meta = head[len(MARKER):]
+        kind = re.search(r"\bkind=(\S+)", meta)
+        key = re.search(r"\bkey=(.*)$", meta)
         auto = tail[len("auto: "):] if tail.startswith("auto: ") else al["albumName"]
-        found.append({"id": al["id"], "name": al["albumName"], "auto": auto, "kind": meta.get("kind"),
-                      "key": meta.get("key"), "count": al.get("assetCount") or 0, "assets": None})
+        found.append({"id": al["id"], "name": al["albumName"], "auto": auto,
+                      "kind": kind.group(1) if kind else None,
+                      "key": key.group(1).strip() or None if key else None,
+                      "count": al.get("assetCount") or 0, "assets": None})
     return found
 
 
