@@ -53,8 +53,9 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   Right (`AlbumsPanel.svelte`): the planned albums with create, update, rename, kept-name and unchanged badges, four
   thumbnails per row, the album name opening a full grid in a modal with the joining and leaving photos ringed, a
   kind filter and an unchanged-rows toggle. A trip or day trip modal also plots where its photos were taken.
-  Move any handle and the right panel replans 400 ms later from the draft, without saving. Apply stays disabled until
-  the config on screen matches the file, so what gets written is always what a scheduled run would write.
+  Move any handle and the right panel replans 400 ms later from the draft, without saving. That draft can be applied
+  too: the request carries the config alongside the token, the server replans it and checks the token the same way, and
+  the confirm panel says the scheduled run will keep using the saved config until you save.
 
 `$core` is an alias for `../src`, so the pure `planner.ts`, `reconcile.ts` and `config.ts` are imported
 as source and bundled by Vite. No copy, no build step in the parent.

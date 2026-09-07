@@ -21,8 +21,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   `$core` alias (`server/vite.config.ts`). `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire
   types. Routes: `GET`/`POST /api/preview` (saved config, draft config), `POST /api/apply`, `GET`/`PUT /api/config`,
   `GET /api/people`, `GET /api/people/<id>/thumbnail`, `GET /api/assets/<id>/thumbnail`, `POST /api/albums/assets`,
-  `GET /api/geocode`. One page, `/`: handles left, albums right. A draft preview carries no token, so only a plan from
-  the saved config can be applied. Apply needs the preview token plus `confirm: true`, and
+  `GET /api/geocode`. One page, `/`: handles left, albums right. Apply takes a token that must match a replan of the
+  same config, saved or draft, so a write always matches a plan someone looked at. Apply needs the preview token plus `confirm: true`, and
   `apply.ts` is the only path that mutates Immich. Config writes need the file etag, are validated field by field in
   `config-io.ts`, keep a `.bak` and swap through a temp file. `DEMO=1` swaps in a fixture library, apply then dry runs.
 - `python/immich_auto_albums.py`: the original stdlib implementation this was ported from, reading the same

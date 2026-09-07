@@ -165,8 +165,9 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 			source: snap.source,
 			windowStart: dayOf(makeContext(cfg, now, windowDays, scope).windowStart),
 			scope,
-			// Only a plan from the saved config can be applied, so a draft carries no token.
-			token: draft ? '' : tokenOf(rows),
+			// A draft is applicable too, and its token is checked the same way: the server replans the
+			// same config and compares. What differs is that the monthly run keeps using the saved config.
+			token: tokenOf(rows),
 			draft,
 			stats: {
 				assets: snap.assets.length,

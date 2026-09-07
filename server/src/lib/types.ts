@@ -56,6 +56,8 @@ export interface ApplyRequest {
 	confirm: true;
 	/** Must match the preview the token came from. */
 	scope?: Scope;
+	/** The unsaved config the preview was planned from, when applying a draft. */
+	config?: unknown;
 	/** Row ids to write. Omitted means every changed row of the preview. */
 	ids?: string[];
 }

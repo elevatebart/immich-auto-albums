@@ -57,7 +57,7 @@
 
 	const dirty = $derived(!!config && JSON.stringify(payload()) !== pristine);
 	const changed = $derived((shown?.rows ?? []).filter((r) => r.op !== 'noop'));
-	const canApply = $derived(!!shown && !shown.draft && !dirty);
+	const canApply = $derived(!!shown && !recomputing && !scanning);
 	const chosen = $derived(changed.filter((r) => selected.has(r.id)));
 	const summary = $derived({
 		create: chosen.filter((r) => r.op === 'create').length,
@@ -135,7 +135,7 @@
 			});
 			issues = [];
 			error = null;
-			selected.clear();
+			select(shown);
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
@@ -181,7 +181,13 @@
 			const data = await api<ApplyResponse>('/api/apply', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ token: shown.token, confirm: true, ids: [...selected], scope })
+				body: JSON.stringify({
+					token: shown.token,
+					confirm: true,
+					ids: [...selected],
+					scope,
+					config: shown.draft ? payload() : undefined
+				})
 			});
 			result = data;
 			await loadAlbums(true);
@@ -276,7 +282,7 @@
 					{#if recomputing}
 						replanning...
 					{:else if shown?.draft}
-						from the unsaved config, save to apply
+						{changed.length} to write, from the config on screen
 					{:else if scanning}
 						scanning the library...
 					{:else if scope === 'window'}
@@ -312,7 +318,7 @@
 					leadingIcon={mdiCloudUploadOutline}
 					onclick={() => (confirming = true)}
 					disabled={!canApply || applying || !chosen.length}
-					title={canApply ? '' : 'Save the config first'}
+					title={shown?.draft ? 'Writes the plan from the config on screen, saved or not' : ''}
 				>
 					Apply {chosen.length}
 				</Button>
@@ -395,6 +401,10 @@
 			shown.source === 'fixture'
 				? 'The fixture library has no Immich behind it, so this runs as a dry run.'
 				: 'Only albums carrying the marker are touched, and album names you changed by hand are kept.'
+		}${
+			shown.draft
+				? ' This plan comes from the config on screen, which is not saved: the scheduled run will keep using the saved one until you save.'
+				: ''
 		}`}
 		onClose={(confirmed) => {
 			confirming = false;
