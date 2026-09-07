@@ -3,9 +3,9 @@ import path from 'node:path';
 import { env } from '$env/dynamic/private';
 import { loadConfig } from '$core/config.js';
 import { ImmichClient } from '$core/immich.js';
-import { dayOf, makeContext, plan, yearsCovered } from '$core/planner.js';
+import { dayOf, makeContext, plan, taggedSince } from '$core/planner.js';
 import { reconcile } from '$core/reconcile.js';
-import type { Action, Asset, Config, ManagedAlbum } from '$core/types.js';
+import type { Action, Asset, Config, ManagedAlbum, Scope } from '$core/types.js';
 import type { Preview, PreviewRow } from '$lib/types';
 import { fixtureAlbums, fixtureAssets } from './fixture.js';
 
@@ -59,7 +59,7 @@ export function immichClient(cfg: Config): ImmichClient {
 	return new ImmichClient(env.IMMICH_URL ?? cfg.immich.url, env.IMMICH_API_KEY);
 }
 
-async function fromImmich(cfg: Config, now: Date, windowDays: number): Promise<Snapshot> {
+async function fromImmich(cfg: Config, now: Date, windowDays: number, scope: Scope): Promise<Snapshot> {
 	const client = immichClient(cfg);
 	try {
 		await client.checkAuth();
@@ -67,10 +67,10 @@ async function fromImmich(cfg: Config, now: Date, windowDays: number): Promise<S
 		const url = env.IMMICH_URL ?? cfg.immich.url;
 		throw new PreviewError(502, `Immich at ${url} is unreachable or rejected the API key: ${(e as Error).message}`);
 	}
-	const assets = await client.fetchAssets();
+	const ctx = makeContext(cfg, now, windowDays, scope);
+	const assets = await client.fetchAssets(scope === 'window' ? ctx.windowStart : undefined);
 	const people = await client.fetchPeople();
-	const ctx = makeContext(cfg, now, windowDays);
-	await client.attachPeople(assets, people, yearsCovered(ctx)[0]);
+	await client.attachPeople(assets, people, taggedSince(ctx));
 	return {
 		source: 'immich',
 		assets: [...assets.values()],
@@ -114,22 +114,22 @@ const tokenOf = (rows: PreviewRow[]) =>
 		.digest('hex')
 		.slice(0, 16);
 
-async function readSnapshot(cfg: Config): Promise<Snapshot> {
+async function readSnapshot(cfg: Config, scope: Scope): Promise<Snapshot> {
 	const now = new Date();
 	if (!env.IMMICH_API_KEY && env.DEMO !== '1') {
 		throw new PreviewError(503, 'IMMICH_API_KEY is not set. Set it, or run with DEMO=1 for the fixture library.');
 	}
 	const windowDays = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
-	return env.IMMICH_API_KEY ? await fromImmich(cfg, now, windowDays) : fromFixture(cfg, now);
+	return env.IMMICH_API_KEY ? await fromImmich(cfg, now, windowDays, scope) : fromFixture(cfg, now);
 }
 
 /** Plan and reconcile over a snapshot already in memory. Microseconds, so a draft config is cheap. */
-function planWith(snapshot: Snapshot, cfg: Config, draft: boolean): Computed {
+function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope): Computed {
 	// The fixture reads the config, so rebuild it for a draft rather than showing stale names.
 	const snap = snapshot.source === 'fixture' ? fromFixture(cfg, snapshot.now) : snapshot;
 	const now = snap.now;
 	const windowDays = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
-	const { plans, absorbed } = plan(cfg, snap.assets, { now, windowDays });
+	const { plans, absorbed } = plan(cfg, snap.assets, { now, windowDays, scope });
 	const actions = reconcile(plans, snap.albums);
 	const rows = actions.map(rowOf);
 	const count = (op: PreviewRow['op']) => rows.filter((r) => r.op === op).length;
@@ -140,7 +140,8 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean): Computed {
 		data: {
 			generatedAt: now.toISOString(),
 			source: snap.source,
-			windowStart: dayOf(makeContext(cfg, now, windowDays).windowStart),
+			windowStart: dayOf(makeContext(cfg, now, windowDays, scope).windowStart),
+			scope,
 			// Only a plan from the saved config can be applied, so a draft carries no token.
 			token: draft ? '' : tokenOf(rows),
 			draft,
@@ -159,37 +160,41 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean): Computed {
 	};
 }
 
-let cached: { at: number; value: Snapshot } | null = null;
-let inflight: Promise<Snapshot> | null = null;
+/** One entry per scope: the windowed scan fetches less, so the two are not interchangeable. */
+const cached = new Map<Scope, { at: number; value: Snapshot }>();
+const inflight = new Map<Scope, Promise<Snapshot>>();
 
-/** A full library scan is slow, so hold the last one and coalesce concurrent requests. */
-async function getSnapshot(refresh = false): Promise<Snapshot> {
-	if (!refresh && cached && Date.now() - cached.at < TTL_MS) return cached.value;
-	inflight ??= readConfig()
-		.then(readSnapshot)
-		.then((value) => {
-			cached = { at: Date.now(), value };
-			return value;
-		})
-		.finally(() => {
-			inflight = null;
-		});
-	return inflight;
+/** A library scan is slow, so hold the last one per scope and coalesce concurrent requests. */
+async function getSnapshot(scope: Scope, refresh = false): Promise<Snapshot> {
+	const hit = cached.get(scope);
+	if (!refresh && hit && Date.now() - hit.at < TTL_MS) return hit.value;
+	if (!inflight.has(scope)) {
+		inflight.set(
+			scope,
+			readConfig()
+				.then((cfg) => readSnapshot(cfg, scope))
+				.then((value) => {
+					cached.set(scope, { at: Date.now(), value });
+					return value;
+				})
+				.finally(() => inflight.delete(scope))
+		);
+	}
+	return inflight.get(scope)!;
 }
 
 /** The plan for the config on disk. This is the only one apply will write. */
-export async function getComputed(refresh = false): Promise<Computed> {
+export async function getComputed(scope: Scope = 'window', refresh = false): Promise<Computed> {
 	const cfg = await readConfig();
-	return planWith(await getSnapshot(refresh), cfg, false);
+	return planWith(await getSnapshot(scope, refresh), cfg, false, scope);
 }
 
 /** The plan for an unsaved config, over the cached library. */
-export async function getDraft(cfg: Config): Promise<Computed> {
-	return planWith(await getSnapshot(), cfg, true);
+export async function getDraft(cfg: Config, scope: Scope = 'window'): Promise<Computed> {
+	return planWith(await getSnapshot(scope), cfg, true, scope);
 }
 
-export const getPreview = (refresh = false) => getComputed(refresh).then((c) => c.data);
+export const getPreview = (scope: Scope = 'window', refresh = false) =>
+	getComputed(scope, refresh).then((c) => c.data);
 
-export const invalidate = () => {
-	cached = null;
-};
+export const invalidate = () => cached.clear();

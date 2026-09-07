@@ -14,7 +14,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		return json({ error: 'token is required; get it from GET /api/preview' }, { status: 400 });
 	}
 	try {
-		const computed = await getComputed();
+		const computed = await getComputed(body.scope === 'all' ? 'all' : 'window');
 		if (body.token !== computed.data.token) {
 			return json(
 				{ error: 'The plan changed since that preview. Rescan, check the table, then confirm again.' },

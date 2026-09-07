@@ -1,4 +1,4 @@
-import type { Asset, Config, Plan } from "./types.js";
+import type { Asset, Config, Plan, Scope } from "./types.js";
 
 // ---- time helpers (all UTC accessors; Asset.t encodes local time as UTC) ----
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -153,13 +153,23 @@ export interface PlanContext {
   cfg: Config;
   now: Date;
   windowStart: Date;
+  /** "window" plans only what the window covers in full, "all" plans the whole library. */
+  scope: Scope;
   /** GPS-less asset ids folded into trips; filled by planTrips, read by planSeasons. */
   absorbed: Set<string>;
 }
 
-export function makeContext(cfg: Config, now = new Date(), windowDays = cfg.immich.windowDays): PlanContext {
-  return { cfg, now, windowStart: new Date(now.getTime() - windowDays * 24 * HOUR), absorbed: new Set() };
+export function makeContext(
+  cfg: Config,
+  now = new Date(),
+  windowDays = cfg.immich.windowDays,
+  scope: Scope = "all",
+): PlanContext {
+  return { cfg, now, windowStart: new Date(now.getTime() - windowDays * 24 * HOUR), scope, absorbed: new Set() };
 }
+
+/** A person year, season or event is planned only when the window holds all of it. */
+const covered = (ctx: PlanContext, start: number) => ctx.scope === "all" || start >= ctx.windowStart.getTime();
 
 export function planTrips(ctx: PlanContext, assets: Asset[]): Plan[] {
   const { cfg, windowStart, absorbed } = ctx;
@@ -225,10 +235,18 @@ export function planGatherings(ctx: PlanContext, assets: Asset[]): Plan[] {
   return plans;
 }
 
+/** How far back face tags must be fetched: the window's own reach, not the planned years. */
+export function taggedSince(ctx: PlanContext): number {
+  return Math.min(ctx.windowStart.getUTCFullYear(), ctx.now.getUTCFullYear() - 1);
+}
+
+/** Years a person album may be planned for. In window scope, only years the window holds in full. */
 export function yearsCovered(ctx: PlanContext): number[] {
   const first = Math.min(ctx.windowStart.getUTCFullYear(), ctx.now.getUTCFullYear() - 1);
   const out: number[] = [];
-  for (let y = first; y <= ctx.now.getUTCFullYear(); y++) out.push(y);
+  for (let y = first; y <= ctx.now.getUTCFullYear(); y++) {
+    if (covered(ctx, Date.UTC(y, 0, 1))) out.push(y);
+  }
   return out;
 }
 
@@ -270,13 +288,16 @@ export function planSeasons(ctx: PlanContext, assets: Asset[]): Plan[] {
     const k = `${season}:${year}`;
     (buckets.get(k) ?? buckets.set(k, { season, year, ids: [] }).get(k)!).ids.push(a.id);
   }
+  const bucketStart = (b: { season: string; year: number }) =>
+    b.season === "Summer" ? Date.UTC(b.year, 6, 1) : Date.UTC(b.year, 11, 20);
   return [...buckets.entries()]
-    .filter(([, b]) => b.ids.length >= cfg.seasons.minPhotos)
+    .filter(([, b]) => b.ids.length >= cfg.seasons.minPhotos && covered(ctx, bucketStart(b)))
     .map(([key, b]) => ({ kind: "season" as const, key, name: `${b.season} ${b.year}`, ids: b.ids, start: new Date(Date.UTC(b.year, 0, 1)) }));
 }
 
 export function planFixedEvents(ctx: PlanContext, assets: Asset[]): Plan[] {
   return ctx.cfg.events.flatMap((e) => {
+    if (!covered(ctx, Date.parse(`${e.from}T00:00:00Z`))) return [];
     const ids = assets.filter((a) => dayOf(a.t) >= e.from && dayOf(a.t) <= e.to).map((a) => a.id);
     if (!ids.length) return [];
     const start = new Date(e.from);
@@ -292,8 +313,12 @@ export function applyOverrides(cfg: Config, plans: Plan[]): Plan[] {
 }
 
 /** Full plan: every rule, overrides applied, sorted by start. */
-export function plan(cfg: Config, assets: Asset[], opts: { now?: Date; windowDays?: number } = {}): { plans: Plan[]; absorbed: Set<string> } {
-  const ctx = makeContext(cfg, opts.now, opts.windowDays);
+export function plan(
+  cfg: Config,
+  assets: Asset[],
+  opts: { now?: Date; windowDays?: number; scope?: Scope } = {},
+): { plans: Plan[]; absorbed: Set<string> } {
+  const ctx = makeContext(cfg, opts.now, opts.windowDays, opts.scope);
   const plans = [
     ...planTrips(ctx, assets),
     ...planGatherings(ctx, assets),

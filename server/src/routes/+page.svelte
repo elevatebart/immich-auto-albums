@@ -7,9 +7,9 @@
 		mdiFileDocumentOutline,
 		mdiRefresh
 	} from '@mdi/js';
-	import { Alert, Button, ConfirmModal, HStack, Heading, Stack, Text } from '@immich/ui';
+	import { Alert, Button, Checkbox, ConfirmModal, HStack, Heading, Stack, Text } from '@immich/ui';
 	import type { ConfigIssue } from '$core/schema.js';
-	import type { Config } from '$core/types.js';
+	import type { Config, Scope } from '$core/types.js';
 	import AlbumsPanel from '$lib/components/AlbumsPanel.svelte';
 	import ConfigPanel from '$lib/components/ConfigPanel.svelte';
 	import type {
@@ -43,6 +43,8 @@
 	let recomputing = $state(false);
 	let applying = $state(false);
 	let confirming = $state(false);
+	/** The window is the default; the whole library is the bypass. */
+	let scope = $state<Scope>('window');
 
 	const payload = () =>
 		config && {
@@ -98,7 +100,7 @@
 		scanning = true;
 		error = null;
 		try {
-			saved = await api<Preview>(`/api/preview${refresh ? '?refresh=1' : ''}`);
+			saved = await api<Preview>(`/api/preview?scope=${scope}${refresh ? '&refresh=1' : ''}`);
 			if (!dirty) select(saved);
 		} catch (e) {
 			error = (e as Error).message;
@@ -127,7 +129,7 @@
 			shown = await api<Preview>('/api/preview', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ config: body })
+				body: JSON.stringify({ config: body, scope })
 			});
 			issues = [];
 			error = null;
@@ -175,7 +177,7 @@
 			const data = await api<ApplyResponse>('/api/apply', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ token: shown.token, confirm: true, ids: [...selected] })
+				body: JSON.stringify({ token: shown.token, confirm: true, ids: [...selected], scope })
 			});
 			note = `${data.dryRun ? 'Dry run, nothing written' : 'Written to Immich'}: ${data.applied} ok, ${data.failed} failed.`;
 			await loadAlbums(true);
@@ -194,11 +196,16 @@
 		loadPeople();
 	});
 
+	/** Switching scope needs a fresh plan from the server, in both directions. */
+	$effect(() => {
+		if (saved && saved.scope !== scope) loadAlbums();
+	});
+
 	/** Every handle move lands here: same config, show the saved plan; changed, debounce a draft. */
 	$effect(() => {
 		const body = payload();
 		const json = JSON.stringify(body);
-		if (!body || !saved) return;
+		if (!body || !saved || saved.scope !== scope) return;
 		if (json === pristine) {
 			shown = saved;
 			select(saved);
@@ -268,12 +275,25 @@
 						from the unsaved config, save to apply
 					{:else if scanning}
 						scanning the library...
+					{:else if scope === 'window'}
+						{changed.length} to write since {shown?.windowStart ?? 'the window'}
 					{:else}
-						{changed.length} to write, from the saved config
+						{changed.length} to write, whole library
 					{/if}
 				</Text>
 			</Stack>
 			<HStack gap={2}>
+				<HStack gap={1} class="pe-1">
+					<Checkbox
+						id="whole-library"
+						checked={scope === 'all'}
+						onCheckedChange={(on) => (scope = on ? 'all' : 'window')}
+						size="small"
+					/>
+					<Text size="tiny" onclick={() => (scope = scope === 'all' ? 'window' : 'all')}>
+						whole library
+					</Text>
+				</HStack>
 				<Button
 					variant="outline"
 					size="tiny"
@@ -320,6 +340,7 @@
 						{selected}
 						{canApply}
 						draftConfig={shown.draft ? payload() : undefined}
+						{scope}
 					/>
 				</div>
 			{:else if scanning}

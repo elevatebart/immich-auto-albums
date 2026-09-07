@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fromToml } from "../src/config.js";
-import { plan, planFixedEvents, planTrips, makeContext } from "../src/planner.js";
+import { plan, planFixedEvents, planTrips, makeContext, taggedSince, yearsCovered } from "../src/planner.js";
 import { reconcile } from "../src/reconcile.js";
 import type { Asset, ManagedAlbum } from "../src/types.js";
 
@@ -66,6 +66,32 @@ describe("rule engines", () => {
       "USA, Apr 2025",
       "France & UK, May 2025",
     ]);
+  });
+
+  it("window scope plans only what the window covers in full", () => {
+    const A = [
+      // Inside a 365 day window: a day trip and photos of a household member this year.
+      ...burst(new Date("2026-07-04T09:00:00Z"), 16, 1 / 3, (t) => mk(t, 45.76, 4.84, "Lyon")),
+      ...burst(new Date("2026-02-01T00:00:00Z"), 12, 24 * 7, (t) => mk(t, 45.19, 5.72, "Grenoble", null, "France", ["Nadia Rivers"])),
+      // Outside it: a 2004 season bucket and the 2019 wedding.
+      ...burst(new Date("2004-07-15T00:00:00Z"), 6, 24, (t) => mk(t, null, null, null)),
+      ...burst(new Date("2019-08-30T00:00:00Z"), 11, 7, (t) => mk(t, null, null, null)),
+    ];
+    const kinds = (scope: "window" | "all") =>
+      plan(cfg, A, { now: NOW, windowDays: 9000, scope }).plans.map((p) => `${p.kind}|${p.name}`);
+    expect(kinds("all")).toEqual(
+      expect.arrayContaining(["season|Summer 2004", "event|Our wedding, Aug 2019", "daytrip|Lyon, 04 Jul 2026"]),
+    );
+    // Same assets, a 365 day window: history is left alone, this year is not.
+    const windowed = plan(cfg, A, { now: NOW, scope: "window" }).plans.map((p) => `${p.kind}|${p.name}`);
+    expect(windowed).toEqual(["person|Nadia 2026", "daytrip|Lyon, 04 Jul 2026"]);
+  });
+
+  it("fetches face tags further back than it plans person years", () => {
+    const ctx = makeContext(cfg, NOW, 365, "window");
+    // Only 2026 is inside the window in full, but London in Sep 2025 still needs its faces.
+    expect(yearsCovered(ctx)).toEqual([2026]);
+    expect(taggedSince(ctx)).toBe(2025);
   });
 
   it("fixed events and overrides", () => {

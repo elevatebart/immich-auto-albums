@@ -13,9 +13,10 @@
 		canApply: boolean;
 		/** Passed to the modal so it opens the same plan the list is showing. */
 		draftConfig?: unknown;
+		scope?: string;
 	}
 
-	let { preview, selected, canApply, draftConfig }: Props = $props();
+	let { preview, selected, canApply, draftConfig, scope }: Props = $props();
 
 	let opened = $state<PreviewRow | null>(null);
 	let thumbHint = $state<string | null>(null);
@@ -161,5 +162,5 @@
 </Card>
 
 {#if opened}
-	<AlbumModal row={opened} {draftConfig} onClose={() => (opened = null)} />
+	<AlbumModal row={opened} {draftConfig} {scope} onClose={() => (opened = null)} />
 {/if}

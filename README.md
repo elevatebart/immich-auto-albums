@@ -7,7 +7,11 @@ Pure planner + reconcile for Immich event albums, with a CLI.
     IMMICH_API_KEY=... CONFIG=./config.toml npm run preview   # writes plan_*.json, decisions_*.csv, run_*.log to out_dir
     IMMICH_API_KEY=... npm run apply
 
-Env overrides: IMMICH_URL, OUT, WINDOW_DAYS, CONFIG. The API key never goes in config.toml.
+Env overrides: IMMICH_URL, OUT, WINDOW_DAYS, CONFIG, SCOPE. The API key never goes in config.toml.
+
+By default a run only looks at the rolling window (`window_days`), and only fetches photos taken inside it. Person
+years, seasons and fixed events are planned only when the window covers them in full, so history is left alone. Pass
+`--all` (or `SCOPE=all`) for the whole library, which is what a first run wants.
 
 UI: `cd server && DEMO=1 npm run dev` for the preview table, the apply confirm and the config form (see `server/README.md`).
 

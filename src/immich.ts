@@ -29,9 +29,10 @@ export class ImmichClient {
   }
 
   /** Local capture time is kept as UTC so getUTC* accessors read local wall-clock values. */
-  async fetchAssets(): Promise<Map<string, Asset>> {
+  async fetchAssets(takenAfter?: Date): Promise<Map<string, Asset>> {
     const out = new Map<string, Asset>();
-    for await (const a of this.search({ withExif: true, visibility: "timeline" })) {
+    const body = { withExif: true, visibility: "timeline", ...(takenAfter ? { takenAfter: takenAfter.toISOString() } : {}) };
+    for await (const a of this.search(body)) {
       const local: string | undefined = a.localDateTime ?? a.fileCreatedAt;
       if (!local) continue;
       const ex = a.exifInfo ?? {};

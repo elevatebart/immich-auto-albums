@@ -1,4 +1,4 @@
-import type { Config, PlanKind } from '$core/types.js';
+import type { Config, PlanKind, Scope } from '$core/types.js';
 
 /** One reconcile action, flattened for the wire. Asset ids stay server side; only counts travel. */
 export interface PreviewRow {
@@ -44,6 +44,8 @@ export interface Preview {
 	token: string;
 	/** True when this came from an unsaved config, which apply refuses. */
 	draft: boolean;
+	/** "window" plans only what the rolling window covers in full, "all" the whole library. */
+	scope: Scope;
 	stats: PreviewStats;
 	rows: PreviewRow[];
 }
@@ -51,6 +53,8 @@ export interface Preview {
 export interface ApplyRequest {
 	token: string;
 	confirm: true;
+	/** Must match the preview the token came from. */
+	scope?: Scope;
 	/** Row ids to write. Omitted means every changed row of the preview. */
 	ids?: string[];
 }

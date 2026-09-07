@@ -15,6 +15,8 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
 
 ## What is here
 
+- `?scope=all` on the preview, and `scope` in the apply and album bodies, plan the whole library instead of the
+  rolling window. The window is the default everywhere, and the checkbox in the album header is the bypass.
 - `GET /api/preview` -> `Preview` (`src/lib/types.ts`): stats plus one row per reconcile action,
   with the create/update/noop op, rename flags, asset counts and the cluster centroid. Asset ids stay
   on the server. `?refresh=1` rescans the library, which is the only slow part and is cached for 10 minutes.

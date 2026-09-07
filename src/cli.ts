@@ -3,8 +3,9 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.js";
 import { ImmichClient } from "./immich.js";
-import { makeContext, plan, yearsCovered } from "./planner.js";
+import { makeContext, plan, taggedSince } from "./planner.js";
 import { descriptionFor, reconcile } from "./reconcile.js";
+import type { Scope } from "./types.js";
 
 const mode = process.argv[2] === "apply" ? "apply" : "preview";
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -15,6 +16,7 @@ const url = process.env.IMMICH_URL ?? cfg.immich.url;
 const apiKey = process.env.IMMICH_API_KEY ?? "";
 const outDir = process.env.OUT ?? cfg.immich.outDir;
 const windowDays = Number(process.env.WINDOW_DAYS ?? cfg.immich.windowDays);
+const scope: Scope = process.argv.includes("--all") || process.env.SCOPE === "all" ? "all" : "window";
 const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15).replace("T", "_");
 
 await mkdir(outDir, { recursive: true });
@@ -30,20 +32,23 @@ if (!apiKey) {
   process.exit(1);
 }
 const client = new ImmichClient(url, apiKey);
-const ctx = makeContext(cfg, new Date(), windowDays);
-log(`Started. mode=${mode} window since ${ctx.windowStart.toISOString().slice(0, 10)}`);
+const ctx = makeContext(cfg, new Date(), windowDays, scope);
+log(
+  `Started. mode=${mode} scope=${scope} window since ${ctx.windowStart.toISOString().slice(0, 10)}` +
+    (scope === "window" ? " (person years, seasons and events outside it are left alone; --all for everything)" : ""),
+);
 await client.checkAuth();
 
-const assets = await client.fetchAssets();
+const assets = await client.fetchAssets(scope === "window" ? ctx.windowStart : undefined);
 log(`Assets: ${assets.size} (${[...assets.values()].filter((a) => a.lat !== null).length} with GPS)`);
 const people = await client.fetchPeople();
 log(`Named people: ${people.length}`);
-const counts = await client.attachPeople(assets, people, yearsCovered(ctx)[0]);
+const counts = await client.attachPeople(assets, people, taggedSince(ctx));
 for (const [name, n] of Object.entries(counts)) log(`  people: ${name} -> ${n}`);
 const missing = cfg.people.household.filter((h) => !people.some((p) => p.name === h));
 if (missing.length) log(`WARN: household names not found in Immich People: ${missing.join(", ")}`);
 
-const { plans, absorbed } = plan(cfg, [...assets.values()], { windowDays });
+const { plans, absorbed } = plan(cfg, [...assets.values()], { windowDays, scope });
 const byKind = plans.reduce<Record<string, number>>((m, p) => ((m[p.kind] = (m[p.kind] ?? 0) + 1), m), {});
 log(`Plans: ${JSON.stringify(byKind)}; GPS-less photos absorbed into trips: ${absorbed.size}`);
 

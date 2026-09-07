@@ -62,6 +62,9 @@ export interface Config {
 
 export type PlanKind = "trip" | "daytrip" | "gathering" | "person" | "season" | "event";
 
+/** How much history a run looks at. "window" is the rolling window, "all" is the whole library. */
+export type Scope = "window" | "all";
+
 export interface Plan {
   kind: PlanKind;
   key: string;

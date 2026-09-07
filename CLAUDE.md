@@ -5,6 +5,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 
 ## Layout
 - `src/planner.ts`: pure, no I/O. `plan(cfg, assets, opts) -> { plans, absorbed }`. Every rule is a `planX(ctx, assets)` function.
+  `opts.scope`: `window` plans only what the rolling window holds in full, `all` plans the whole library. The planner
+  defaults to `all`; the CLI and the server default to `window` and take `--all` / `SCOPE=all` / `?scope=all`.
 - `src/reconcile.ts`: pure. `reconcile(plans, managedAlbums) -> Action[]` (create | update | noop). Handles user renames.
 - `src/config.ts`: `config.toml` -> `Config` (`fromToml`, which validates) and back (`toToml`, canonical, comments
   from a fixed template). TOML keys are snake_case, `Config` is camelCase.
@@ -40,6 +42,10 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Only albums whose description starts with the marker are ever touched. Description line 2 is `auto: <generated name>`;
   when album name != auto name the user renamed it and the name is preserved.
 - Event kinds (trip, daytrip, gathering) match existing albums by >=50% asset overlap within 45 days; person, season, event match by key.
+- In `window` scope a person year, season or fixed event is planned only when the window covers it in full, so a
+  partial slice can never strip photos out of an album that a full run created. Face tags are still fetched from
+  `taggedSince(ctx)`, which reaches further back than the planned years: a trip needs its faces even when the year
+  it sits in is not planned.
 - The API key comes from `IMMICH_API_KEY` only. Never write it to config or logs.
 - Immich API facts verified against the OpenAPI spec: `POST /search/metadata` (page/size/withExif/visibility/personIds/takenAfter as full ISO datetime),
   `GET /people?withHidden=false&page&size`, `GET /people/{id}/thumbnail` (octet-stream),
@@ -70,3 +76,4 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 ## Running
     npm ci && npm run build && npm test
     IMMICH_API_KEY=... IMMICH_URL=http://nas:2283 CONFIG=./config.toml npm run preview
+    npm run preview -- --all      # the whole library, not just the window

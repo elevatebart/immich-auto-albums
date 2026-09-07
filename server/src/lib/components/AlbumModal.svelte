@@ -8,10 +8,11 @@
 		row: PreviewRow;
 		/** The draft config when the panel shows a draft, so the modal opens the same plan. */
 		draftConfig?: unknown;
+		scope?: string;
 		onClose: () => void;
 	}
 
-	let { row, draftConfig, onClose }: Props = $props();
+	let { row, draftConfig, scope, onClose }: Props = $props();
 
 	let data = $state<AlbumAssets | null>(null);
 	let error = $state<string | null>(null);
@@ -27,7 +28,7 @@
 			const res = await fetch('/api/albums/assets', {
 				method: 'POST',
 				headers: { 'content-type': 'application/json' },
-				body: JSON.stringify({ id: row.id, config: draftConfig })
+				body: JSON.stringify({ id: row.id, config: draftConfig, scope })
 			});
 			const body = await res.json();
 			if (!res.ok) throw new Error(body.error ?? res.statusText);

@@ -7,14 +7,17 @@ const CAP = 300;
 
 /** Asset ids for one planned album, so the modal can show it. Takes a draft config like the preview. */
 export const POST: RequestHandler = async ({ request }) => {
-	const body = (await request.json().catch(() => null)) as { id?: string; config?: unknown } | null;
+	const body = (await request.json().catch(() => null)) as
+		| { id?: string; config?: unknown; scope?: string }
+		| null;
 	if (!body?.id) return json({ error: 'id is required' }, { status: 400 });
 	try {
-		let computed = await getComputed();
+		const scope = body.scope === 'all' ? 'all' : 'window';
+		let computed = await getComputed(scope);
 		if (body.config !== undefined) {
 			const { config, issues } = validateConfig(body.config);
 			if (issues.length) return json({ error: `${issues.length} invalid field(s)`, issues }, { status: 400 });
-			computed = await getDraft(config);
+			computed = await getDraft(config, scope);
 		}
 		const action = computed.actions.find((a) => rowId(a) === body.id);
 		if (!action) return json({ error: `no album ${body.id} in this plan` }, { status: 404 });
