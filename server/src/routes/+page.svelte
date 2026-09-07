@@ -61,6 +61,7 @@
 	const summary = $derived({
 		create: chosen.filter((r) => r.op === 'create').length,
 		update: chosen.filter((r) => r.op === 'update').length,
+		rename: chosen.filter((r) => r.op === 'rename').length,
 		add: chosen.reduce((s, r) => s + r.add, 0),
 		remove: chosen.reduce((s, r) => s + r.remove, 0)
 	});
@@ -358,7 +359,7 @@
 		confirmText={applying ? 'Applying...' : 'Confirm and write'}
 		confirmColor="primary"
 		disabled={applying}
-		prompt={`${summary.create} albums created, ${summary.update} updated, ${summary.add} photos added, ${summary.remove} removed. ${
+		prompt={`${summary.create} albums created, ${summary.update} updated, ${summary.rename} renamed, ${summary.add} photos added, ${summary.remove} removed. ${
 			shown.source === 'fixture'
 				? 'The fixture library has no Immich behind it, so this runs as a dry run.'
 				: 'Only albums carrying the marker are touched, and album names you changed by hand are kept.'

@@ -4,7 +4,8 @@ import type { Config, PlanKind, Scope } from '$core/types.js';
 export interface PreviewRow {
 	/** `kind:key`, the handle POST /api/apply takes. */
 	id: string;
-	op: 'create' | 'update' | 'noop';
+	/** "rename" writes the title and the record, and moves no photos. */
+	op: 'create' | 'update' | 'rename' | 'noop';
 	kind: PlanKind;
 	key: string;
 	/** Name the planner generated for this run. */
@@ -32,6 +33,7 @@ export interface PreviewStats {
 	managedAlbums: number;
 	create: number;
 	update: number;
+	rename: number;
 	noop: number;
 }
 
@@ -61,7 +63,7 @@ export interface ApplyRequest {
 
 export interface ApplyResult {
 	id: string;
-	op: 'create' | 'update';
+	op: 'create' | 'update' | 'rename';
 	name: string;
 	add: number;
 	remove: number;

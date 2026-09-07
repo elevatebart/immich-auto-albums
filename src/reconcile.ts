@@ -58,8 +58,9 @@ export function reconcile(plans: Plan[], existing: ManagedAlbum[]): Action[] {
     const userRenamed = al.name !== al.auto;
     const rename = !userRenamed && al.name !== plan.name;
     const staleDesc = al.auto !== plan.name;
-    if (!add.length && !remove.length && !rename && !staleDesc) actions.push({ op: "noop", plan, album: al });
-    else actions.push({ op: "update", plan, album: al, add, remove, rename, userRenamed });
+    const moves = add.length > 0 || remove.length > 0;
+    if (!moves && !rename && !staleDesc) actions.push({ op: "noop", plan, album: al });
+    else actions.push({ op: moves ? "update" : "rename", plan, album: al, add, remove, rename, userRenamed });
   }
   return actions;
 }

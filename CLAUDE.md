@@ -7,7 +7,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `src/planner.ts`: pure, no I/O. `plan(cfg, assets, opts) -> { plans, absorbed }`. Every rule is a `planX(ctx, assets)` function.
   `opts.scope`: `window` plans only what the rolling window holds in full, `all` plans the whole library. The planner
   defaults to `all`; the CLI and the server default to `window` and take `--all` / `SCOPE=all` / `?scope=all`.
-- `src/reconcile.ts`: pure. `reconcile(plans, managedAlbums) -> Action[]` (create | update | noop). Handles user renames.
+- `src/reconcile.ts`: pure. `reconcile(plans, managedAlbums) -> Action[]` (create | update | rename | noop). `update`
+  moves photos, `rename` only writes the title and the `auto:` line. Handles user renames.
 - `src/config.ts`: `config.toml` -> `Config` (`fromToml`, which validates) and back (`toToml`, canonical, comments
   from a fixed template). TOML keys are snake_case, `Config` is camelCase.
 - `src/schema.ts`: JSON Schema 2020-12 for `Config`, plus `schemaField(path)`. No validator import, so a form can

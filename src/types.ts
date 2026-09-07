@@ -80,5 +80,6 @@ export interface ManagedAlbum {
 
 export type Action =
   | { op: "create"; plan: Plan }
-  | { op: "update"; plan: Plan; album: ManagedAlbum; add: string[]; remove: string[]; rename: boolean; userRenamed: boolean }
+  /** "update" moves photos, "rename" only writes the title and the auto line. */
+  | { op: "update" | "rename"; plan: Plan; album: ManagedAlbum; add: string[]; remove: string[]; rename: boolean; userRenamed: boolean }
   | { op: "noop"; plan: Plan; album: ManagedAlbum };

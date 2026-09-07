@@ -36,7 +36,7 @@ export async function applyActions(c: Computed, ids?: string[]): Promise<ApplyRe
 		const row: ApplyResult = {
 			id: rowId(a),
 			op: a.op,
-			name: a.op === 'update' && a.userRenamed ? a.album.name : a.plan.name,
+			name: a.op !== 'create' && a.userRenamed ? a.album.name : a.plan.name,
 			add: a.op === 'create' ? a.plan.ids.length : a.add.length,
 			remove: a.op === 'create' ? 0 : a.remove.length,
 			ok: true

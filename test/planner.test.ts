@@ -135,5 +135,14 @@ describe("reconcile", () => {
     expect(a1.op === "update" && a1.rename && !a1.userRenamed && a1.add.length === 4).toBe(true);
     const a2 = reconcile([trip], [yours])[0];
     expect(a2.op === "update" && !a2.rename && a2.userRenamed).toBe(true);
+
+    // Same photos, a stale generated name: a rename, not an update.
+    const named: ManagedAlbum = { ...mine, id: "z", assets: new Set(trip.ids) };
+    const a3 = reconcile([trip], [named])[0];
+    expect([a3.op, a3.op !== "noop" && a3.rename]).toEqual(["rename", true]);
+
+    // Same photos, same name: nothing to do.
+    const same: ManagedAlbum = { ...named, id: "w", name: trip.name, auto: trip.name };
+    expect(reconcile([trip], [same])[0].op).toBe("noop");
   });
 });

@@ -23,11 +23,16 @@ export const POST: RequestHandler = async ({ request }) => {
 		if (!action) return json({ error: `no album ${body.id} in this plan` }, { status: 404 });
 		return json({
 			id: body.id,
-			name: action.op === 'update' && action.userRenamed ? action.album.name : action.plan.name,
+			name: action.op === 'update' || action.op === 'rename' ? (action.userRenamed ? action.album.name : action.plan.name) : action.plan.name,
 			ids: action.plan.ids.slice(0, CAP),
 			total: action.plan.ids.length,
-			add: action.op === 'update' ? action.add.slice(0, CAP) : action.op === 'create' ? action.plan.ids.slice(0, CAP) : [],
-			remove: action.op === 'update' ? action.remove.slice(0, CAP) : []
+			add:
+				action.op === 'create'
+					? action.plan.ids.slice(0, CAP)
+					: action.op === 'noop'
+						? []
+						: action.add.slice(0, CAP),
+			remove: action.op === 'update' || action.op === 'rename' ? action.remove.slice(0, CAP) : []
 		});
 	} catch (e) {
 		const status = e instanceof PreviewError ? e.status : 500;

@@ -71,8 +71,8 @@ for (const a of actions) {
     `+${a.add.length} -${a.remove.length}` +
     (a.rename ? `, was: ${a.album.name}` : "") +
     (a.userRenamed ? ", keeping your name" : "");
-  csv.push([a.plan.kind, "update", q(a.plan.name), a.plan.ids.length, q(detail)].join(","));
-  log(`  update  ${a.plan.kind.padEnd(9)} ${a.plan.name} (${detail})`);
+  csv.push([a.plan.kind, a.op, q(a.plan.name), a.plan.ids.length, q(detail)].join(","));
+  log(`  ${a.op.padEnd(7)} ${a.plan.kind.padEnd(9)} ${a.plan.name} (${detail})`);
   if (mode !== "apply") continue;
   await client.updateAlbum(a.album.id, a.userRenamed ? a.album.name : a.plan.name, desc);
   if (a.add.length) await client.addAssets(a.album.id, a.add);

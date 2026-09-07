@@ -88,24 +88,27 @@ function fromFixture(cfg: Config, now: Date): Snapshot {
 
 export const rowId = (a: Action) => `${a.plan.kind}:${a.plan.key}`;
 
-const rowOf = (a: Action): PreviewRow => ({
-	id: rowId(a),
-	op: a.op,
-	kind: a.plan.kind,
-	key: a.plan.key,
-	name: a.plan.name,
-	start: dayOf(a.plan.start),
-	assets: a.plan.ids.length,
-	add: a.op === 'update' ? a.add.length : a.op === 'create' ? a.plan.ids.length : 0,
-	remove: a.op === 'update' ? a.remove.length : 0,
-	rename: a.op === 'update' && a.rename,
-	userRenamed: a.op === 'update' && a.userRenamed,
-	albumId: a.op === 'create' ? undefined : a.album.id,
-	albumName: a.op === 'create' ? undefined : a.album.name,
-	centroid: a.plan.centroid,
-	// Enough for the strip in the list. The modal asks for the rest.
-	sample: a.plan.ids.slice(0, 4)
-});
+const rowOf = (a: Action): PreviewRow => {
+	const moves = a.op === 'update' || a.op === 'rename';
+	return {
+		id: rowId(a),
+		op: a.op,
+		kind: a.plan.kind,
+		key: a.plan.key,
+		name: a.plan.name,
+		start: dayOf(a.plan.start),
+		assets: a.plan.ids.length,
+		add: moves ? a.add.length : a.op === 'create' ? a.plan.ids.length : 0,
+		remove: moves ? a.remove.length : 0,
+		rename: moves && a.rename,
+		userRenamed: moves && a.userRenamed,
+		albumId: a.op === 'create' ? undefined : a.album.id,
+		albumName: a.op === 'create' ? undefined : a.album.name,
+		centroid: a.plan.centroid,
+		// Enough for the strip in the list. The modal asks for the rest.
+		sample: a.plan.ids.slice(0, 4)
+	};
+};
 
 /** Digest of what apply would do, so a stale confirm can be rejected. */
 const tokenOf = (rows: PreviewRow[]) =>
@@ -153,6 +156,7 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 				managedAlbums: snap.albums.length,
 				create: count('create'),
 				update: count('update'),
+				rename: count('rename'),
 				noop: count('noop')
 			},
 			rows

@@ -392,9 +392,10 @@ def apply(plans, existing, writer):
         stale_desc = al["auto"] != plan["name"]
         if not (add or rem or rename or stale_desc):
             continue
+        op = "update" if (add or rem) else "rename"  # a rename moves no photos
         detail = f"+{len(add)} -{len(rem)}" + (f", was: {al['name']}" if rename else "") + (", keeping your name" if user_renamed else "")
-        writer.writerow([plan["kind"], "update", plan["name"], len(ids), detail])
-        log(f"  update  {plan['kind']:9} {plan['name']} ({detail})")
+        writer.writerow([plan["kind"], op, plan["name"], len(ids), detail])
+        log(f"  {op:7} {plan['kind']:9} {plan['name']} ({detail})")
         if DRY_RUN:
             continue
         api("PATCH", f"/albums/{al['id']}", {"albumName": al["name"] if user_renamed else plan["name"], "description": desc_for(plan)})
