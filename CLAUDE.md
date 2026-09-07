@@ -9,6 +9,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `src/config.ts`: `config.toml` -> `Config`. TOML keys are snake_case, `Config` is camelCase.
 - `src/immich.ts`: fetch client for the Immich REST API (`x-api-key` header, `/api` prefix).
 - `src/cli.ts`: `preview` and `apply`. Writes `run_*.log`, `decisions_*.csv`, `plan_*.json` to `out_dir`.
+- `server/`: SvelteKit UI. Imports `src/` through the `$core` alias (`server/vite.config.ts`).
+  `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire types. Only `GET /api/preview` exists so far, plus a fixture library for `DEMO=1`.
 - `test/planner.test.ts`: golden cases. Run `npm test` before and after any planner change.
 
 ## Invariants

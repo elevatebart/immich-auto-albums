@@ -8,6 +8,8 @@ Pure planner + reconcile for Immich event albums, with a CLI.
 
 Env overrides: IMMICH_URL, OUT, WINDOW_DAYS, CONFIG. The API key never goes in config.toml.
 
+UI: `cd server && DEMO=1 npm run dev` for the read-only preview table (see `server/README.md`).
+
 Layout: `src/planner.ts` (pure, no I/O), `src/reconcile.ts` (pure), `src/config.ts` (TOML -> Config),
 `src/immich.ts` (fetch client), `src/cli.ts`. `test/` holds the golden cases ported from the Python version.
 
