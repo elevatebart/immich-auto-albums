@@ -1,12 +1,17 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import type { Preview, PreviewRow } from '$lib/types';
+	import { SvelteSet } from 'svelte/reactivity';
+	import type { ApplyResponse, Preview, PreviewRow } from '$lib/types';
 
 	let preview = $state<Preview | null>(null);
 	let error = $state<string | null>(null);
 	let loading = $state(true);
 	let hideNoop = $state(true);
 	let kind = $state('all');
+	let selected = $state(new SvelteSet<string>());
+	let confirming = $state(false);
+	let applying = $state(false);
+	let result = $state<ApplyResponse | null>(null);
 
 	async function load(refresh = false) {
 		loading = true;
@@ -16,6 +21,8 @@
 			const body = await res.json();
 			if (!res.ok) throw new Error(body.error ?? res.statusText);
 			preview = body as Preview;
+			selected = new SvelteSet(changed(preview).map((r) => r.id));
+			confirming = false;
 		} catch (e) {
 			error = (e as Error).message;
 		} finally {
@@ -23,7 +30,32 @@
 		}
 	}
 
+	/** Sends the token of the preview on screen, so a plan that moved underneath is rejected. */
+	async function apply() {
+		if (!preview) return;
+		applying = true;
+		error = null;
+		try {
+			const res = await fetch('/api/apply', {
+				method: 'POST',
+				headers: { 'content-type': 'application/json' },
+				body: JSON.stringify({ token: preview.token, confirm: true, ids: [...selected] })
+			});
+			const body = await res.json();
+			if (!res.ok) throw new Error(body.error ?? res.statusText);
+			result = body as ApplyResponse;
+			await load(true);
+		} catch (e) {
+			error = (e as Error).message;
+		} finally {
+			applying = false;
+		}
+	}
+
 	onMount(() => load());
+
+	const changed = (p: Preview) => p.rows.filter((r) => r.op !== 'noop');
+	const toggle = (id: string) => (selected.has(id) ? selected.delete(id) : selected.add(id));
 
 	const kinds = $derived([...new Set(preview?.rows.map((r) => r.kind) ?? [])].sort());
 	const rows = $derived(
@@ -32,6 +64,16 @@
 			.filter((r) => kind === 'all' || r.kind === kind)
 			.sort((a, b) => b.start.localeCompare(a.start))
 	);
+
+	const chosen = $derived(
+		(preview ? changed(preview) : []).filter((r) => selected.has(r.id))
+	);
+	const summary = $derived({
+		create: chosen.filter((r) => r.op === 'create').length,
+		update: chosen.filter((r) => r.op === 'update').length,
+		add: chosen.reduce((s, r) => s + r.add, 0),
+		remove: chosen.reduce((s, r) => s + r.remove, 0)
+	});
 
 	const delta = (r: PreviewRow) =>
 		[r.add ? `+${r.add}` : '', r.remove ? `-${r.remove}` : ''].filter(Boolean).join(' ') || '-';
@@ -61,8 +103,18 @@
 	</p>
 	<p class="stats">
 		<b>{preview.stats.create}</b> to create, <b>{preview.stats.update}</b> to update,
-		<b>{preview.stats.noop}</b> unchanged. Nothing is written to Immich from this page.
+		<b>{preview.stats.noop}</b> unchanged.
 	</p>
+
+	{#if result}
+		<p class="result">
+			{result.dryRun ? 'Dry run, nothing written' : 'Written to Immich'}: {result.applied} ok, {result.failed}
+			failed.
+			{#each result.results.filter((r) => !r.ok) as r (r.id)}
+				<span class="muted">{r.name}: {r.error}</span>
+			{/each}
+		</p>
+	{/if}
 
 	<div class="filters">
 		<label><input type="checkbox" bind:checked={hideNoop} /> hide unchanged</label>
@@ -71,11 +123,38 @@
 			{#each kinds as k (k)}<option value={k}>{k}</option>{/each}
 		</select>
 		<span class="muted">{rows.length} rows</span>
+		<button
+			class="primary"
+			onclick={() => (confirming = true)}
+			disabled={loading || applying || confirming || !chosen.length}
+		>
+			Apply {chosen.length} selected
+		</button>
 	</div>
+
+	{#if confirming}
+		<div class="confirm">
+			<b>Write to Immich?</b>
+			<p>
+				{summary.create} albums created, {summary.update} updated, {summary.add} photos added, {summary.remove}
+				removed.
+				{#if preview.source === 'fixture'}
+					The fixture library has no Immich behind it, so this runs as a dry run.
+				{:else}
+					Only albums carrying the marker are touched, and album names you changed by hand are kept.
+				{/if}
+			</p>
+			<button class="primary" onclick={apply} disabled={applying}>
+				{applying ? 'Applying...' : 'Confirm and write'}
+			</button>
+			<button onclick={() => (confirming = false)} disabled={applying}>Cancel</button>
+		</div>
+	{/if}
 
 	<table>
 		<thead>
 			<tr>
+				<th class="pick"></th>
 				<th>Start</th>
 				<th>Kind</th>
 				<th>Album</th>
@@ -86,8 +165,18 @@
 			</tr>
 		</thead>
 		<tbody>
-			{#each rows as r (r.kind + r.key)}
+			{#each rows as r (r.id)}
 				<tr>
+					<td class="pick">
+						{#if r.op !== 'noop'}
+							<input
+								type="checkbox"
+								checked={selected.has(r.id)}
+								onchange={() => toggle(r.id)}
+								aria-label="apply {r.name}"
+							/>
+						{/if}
+					</td>
 					<td class="mono">{r.start}</td>
 					<td>{r.kind}</td>
 					<td>
@@ -165,6 +254,38 @@
 		padding: 0.5rem 0.75rem;
 		border-left: 3px solid #b42318;
 		background: #fef3f2;
+	}
+	.result {
+		display: flex;
+		flex-direction: column;
+		gap: 0.15rem;
+		padding: 0.5rem 0.75rem;
+		border-left: 3px solid #0a5c2b;
+		background: #f2fbf5;
+	}
+	.confirm {
+		max-width: 70ch;
+		padding: 0.75rem;
+		margin: 0.5rem 0;
+		border: 1px solid #e0b34d;
+		border-radius: 4px;
+		background: #fffaf0;
+	}
+	.confirm p {
+		margin: 0.35rem 0 0.75rem;
+	}
+	.primary {
+		border-color: #1b1b1b;
+		background: #1b1b1b;
+		color: #fff;
+	}
+	.primary:disabled {
+		border-color: #ccc;
+		background: #f3f3f3;
+		color: #999;
+	}
+	.pick {
+		width: 1.5rem;
 	}
 	.fixture {
 		padding: 0 0.4rem;

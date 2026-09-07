@@ -10,7 +10,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `src/immich.ts`: fetch client for the Immich REST API (`x-api-key` header, `/api` prefix).
 - `src/cli.ts`: `preview` and `apply`. Writes `run_*.log`, `decisions_*.csv`, `plan_*.json` to `out_dir`.
 - `server/`: SvelteKit UI. Imports `src/` through the `$core` alias (`server/vite.config.ts`).
-  `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire types. Only `GET /api/preview` exists so far, plus a fixture library for `DEMO=1`.
+  `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire types. `GET /api/preview` and
+  `POST /api/apply` exist; apply needs the preview token plus `confirm: true`, and `src/lib/server/apply.ts` is the only
+  path that mutates Immich. No config editing yet. `DEMO=1` swaps in a fixture library and makes apply a dry run.
 - `test/planner.test.ts`: golden cases. Run `npm test` before and after any planner change.
 
 ## Invariants
