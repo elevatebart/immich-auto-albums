@@ -28,7 +28,9 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   renames, and drops the preview cache. `warnings` covers legal but costly edits, such as a new marker orphaning
   the albums tagged with the old one.
 - `/`: the preview table, with kind filter, unchanged-rows toggle, per-row checkboxes and a confirm modal that
-  spells out the counts before anything is written.
+  spells out the counts before anything is written. Above it, a Leaflet map of the cluster centroids: one circle per
+  located row, sized by photo count, coloured like the op badge. Clicking a circle highlights its row and clicking a
+  row pans to its circle. The map follows the table filters, so it only ever shows the rows on screen.
 - `/config`: the config form. Sliders for everything numeric, `MultiSelect` of Immich people for the household, a
   Leaflet map with draggable pins for the homes, native date inputs for the quiet period and the fixed events, and
   row editors for aliases, events and overrides. Check file renders the TOML through the dry run; Save writes it.
@@ -37,8 +39,10 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
 as source and bundled by Vite. No copy, no build step in the parent.
 
 The UI is built from `@immich/ui` (pinned) on Tailwind 4, with its theme imported in `src/app.css`, so the pages look
-like Immich rather than like a second product. Two things are hand-rolled because the library has no equivalent: the
-slider row in `src/lib/components/Slider.svelte` and the Leaflet map in `HomesMap.svelte`. Wide data tables are plain
+like Immich rather than like a second product. Three things are hand-rolled because the library has no equivalent: the
+slider row in `src/lib/components/Slider.svelte` and the two Leaflet maps, `HomesMap.svelte` and `CentroidsMap.svelte`,
+which share `src/lib/leaflet.ts`. Both maps fit their bounds only once the container has a real size, since Leaflet
+otherwise lands on zoom 0, and only refit when the data changes, so a pan or a click is never undone. Wide data tables are plain
 `<table>` elements, since the library's `Table` distributes columns evenly.
 
 Config values are camelCase on the wire and snake_case in the file; `toToml` owns that mapping and regenerates the

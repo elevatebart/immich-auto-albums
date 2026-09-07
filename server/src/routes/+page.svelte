@@ -18,6 +18,7 @@
 		Stack,
 		Text
 	} from '@immich/ui';
+	import CentroidsMap from '$lib/components/CentroidsMap.svelte';
 	import type { ApplyResponse, Preview, PreviewRow } from '$lib/types';
 
 	let preview = $state<Preview | null>(null);
@@ -29,6 +30,7 @@
 	let confirming = $state(false);
 	let applying = $state(false);
 	let result = $state<ApplyResponse | null>(null);
+	let focused = $state<string | undefined>(undefined);
 
 	async function load(refresh = false) {
 		loading = true;
@@ -88,6 +90,11 @@
 		update: chosen.filter((r) => r.op === 'update').length,
 		add: chosen.reduce((s, r) => s + r.add, 0),
 		remove: chosen.reduce((s, r) => s + r.remove, 0)
+	});
+
+	/** A click on the map scrolls its row into view. */
+	$effect(() => {
+		if (focused) document.getElementById(`row-${focused}`)?.scrollIntoView({ block: 'nearest' });
 	});
 
 	const delta = (r: PreviewRow) =>
@@ -168,6 +175,8 @@
 						</Text>
 					</HStack>
 
+					<CentroidsMap {rows} bind:focused />
+
 					<div class="overflow-x-auto">
 						<table class="w-full text-sm">
 							<thead class="text-primary">
@@ -184,7 +193,12 @@
 							</thead>
 							<tbody>
 								{#each rows as r (r.id)}
-									<tr class="border-subtle border-b align-top">
+									<tr
+										id="row-{r.id}"
+										class="border-subtle border-b align-top"
+										class:bg-primary-50={focused === r.id}
+										onclick={() => (focused = r.id)}
+									>
 										<td class="py-2">
 											{#if r.op !== 'noop'}
 												<Checkbox

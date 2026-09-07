@@ -35,9 +35,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Names in albums are English; place names come from Immich's geocoder through `normPlace` (aliases in config).
 
 ## Roadmap
-1. Done. `server/` holds the API key, exposes preview, apply, config and people, and the UI has the clustering sliders,
-   the people picker, the Leaflet homes map, event date pickers and the preview table with badges. Still open from the
-   original sketch: a map of the cluster centroids (the preview table links each one to OSM instead).
+1. Done. `server/` holds the API key, exposes preview, apply, config and people. The UI has the clustering sliders, the
+   people picker, the Leaflet homes map, event date pickers, the preview table with badges and the centroid map, which
+   is cross-linked with the table through a focused row id.
 2. JSON Schema for `Config`, shared by the form and by a future Immich plugin settings form.
 3. Docker image for the NAS (`node:22-slim`), monthly run via DSM Task Scheduler as root.
 
