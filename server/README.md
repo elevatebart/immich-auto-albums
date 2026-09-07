@@ -6,6 +6,9 @@ SvelteKit UI for the planner. Roadmap item 1, first slice: read-only preview.
     IMMICH_API_KEY=... npm run dev        # http://localhost:5173
     DEMO=1 npm run dev                   # no Immich needed, fixture library
 
+`config.toml` is gitignored, so copy `config.example.toml` first. Every route answers 404 with that hint when it is
+missing.
+
 Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (default `../config.toml`),
 `WINDOW_DAYS`. The key stays server side; it is never sent to the browser or written to the config.
 `server/.env` works in dev and is gitignored.

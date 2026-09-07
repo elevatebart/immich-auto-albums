@@ -2,6 +2,11 @@ node_modules/
 dist/
 server/.svelte-kit/
 server/build/
+# Personal: homes and household names. Start from config.example.toml.
+/config.toml
+/config.toml.bak
+/config.toml.tmp
+
 run_*.log
 decisions_*.csv
 plan_*.json

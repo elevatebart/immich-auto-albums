@@ -1,0 +1,97 @@
+# Config for the golden tests. Same thresholds as the real one, invented people and homes.
+# Do not point a live run at this file.
+
+[immich]
+url = "http://localhost:2283"
+out_dir = "."                                   # logs and decision CSVs
+window_days = 365                               # rolling recompute window; WINDOW_DAYS env overrides
+marker = "[auto-albums]"                        # album description prefix; only tagged albums are ever touched
+
+[people]
+me = "Sam Rivers"
+household = ["Sam Rivers", "Nadia Rivers", "Theo Rivers"]
+with_share = 0.4          # share of a trip's face-tagged photos a guest must appear in to be named
+with_min_tagged = 5       # minimum face-tagged photos before naming anyone
+max_named = 3
+no_people_from = 2023-06-01   # trips starting in this range never get "with ..."
+no_people_to = 2023-07-31
+no_people_places = ["Versoix", "Bilieu"]
+
+# Homes, in chronological order. Each applies until the next one starts.
+[[homes]]
+from = 2002-01-01
+lat = 38.722
+lon = -9.139
+label = "Lisbon"
+
+[[homes]]
+from = 2007-10-01
+lat = 41.150
+lon = -8.610
+label = "Porto"
+
+[[homes]]
+from = 2012-02-28
+lat = 52.520
+lon = 13.405
+label = "Berlin"
+
+[[homes]]
+from = 2016-01-01
+lat = 48.208
+lon = 16.373
+label = "Vienna"
+
+[[homes]]
+from = 2023-06-08
+lat = 45.190
+lon = 5.720
+label = "Grenoble"
+
+[clustering]
+home_km = 20
+place_km = 5
+merge_label_km = 15
+dominant_share = 0.75
+trip_gap_hours = 72
+trip_min_photos = 10
+trip_min_days = 2
+daytrip_min_photos = 15
+gather_gap_hours = 2
+gather_min_photos = 30
+gather_min_guests = 3
+
+[person_years]
+min_photos = 50
+household_min_photos = 10
+
+[seasons]
+no_gps_era_end = 2012-03-01   # seasonal buckets only for GPS-less photos before this date
+min_photos = 5
+
+# Geocoder label -> name used in albums. Applies to cities and states.
+[aliases]
+"City of Westminster" = "London"
+"Manhattan" = "New York City"
+"Ipanema" = "Rio de Janeiro"
+"Lincolnwood" = "Chicago"
+"Coppet" = "Versoix"
+"Gex" = "Versoix"
+"Divonne-les-Bains" = "Versoix"
+
+# Hand-declared events: every photo in the inclusive range, GPS or not.
+[[events]]
+name = "Our wedding"
+from = 2019-08-30
+to = 2019-09-01
+
+[[events]]
+name = "Engagement celebration"
+from = 2018-08-23
+to = 2018-08-26
+
+# Rename generated albums by kind and key prefix (key = first photo date, printed in the log).
+[[overrides]]
+kind = "trip"
+key_prefix = "2020-08"
+name = "Around Lake Michigan 2020"

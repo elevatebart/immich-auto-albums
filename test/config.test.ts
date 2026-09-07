@@ -2,11 +2,11 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fromToml, toToml } from "../src/config.js";
 
-const text = readFileSync(new URL("../config.toml", import.meta.url), "utf8");
+const text = readFileSync(new URL("./fixtures/config.toml", import.meta.url), "utf8");
 const cfg = fromToml(text);
 
 describe("toToml", () => {
-  it("round trips the shipped config", () => {
+  it("round trips the test config", () => {
     expect(fromToml(toToml(cfg))).toEqual(cfg);
   });
 

@@ -20,7 +20,13 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   table, `/config` form. Apply needs the preview token plus `confirm: true`, and
   `apply.ts` is the only path that mutates Immich. Config writes need the file etag, are validated field by field in
   `config-io.ts`, keep a `.bak` and swap through a temp file. `DEMO=1` swaps in a fixture library, apply then dry runs.
-- `test/planner.test.ts`: golden cases. Run `npm test` before and after any planner change.
+- `test/planner.test.ts`: golden cases. Run `npm test` before and after any planner change. Tests read
+  `test/fixtures/config.toml`, never the real one.
+
+## Config files
+- `config.toml` is local and gitignored: it holds homes and household names. `config.example.toml` is the committed
+  starting point, `test/fixtures/config.toml` is the tests' own copy, `config.schema.json` is the generated schema.
+- A missing config answers 404 on every route with the hint to copy the example.
 
 ## Invariants
 - Planner and reconcile stay pure so a Svelte UI and, later, an Immich WASM plugin can wrap them.

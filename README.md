@@ -2,6 +2,7 @@
 
 Pure planner + reconcile for Immich event albums, with a CLI.
 
+    cp config.example.toml config.toml   # config.toml is gitignored: homes and names are personal
     npm ci && npm run build
     IMMICH_API_KEY=... CONFIG=./config.toml npm run preview   # writes plan_*.json, decisions_*.csv, run_*.log to out_dir
     IMMICH_API_KEY=... npm run apply

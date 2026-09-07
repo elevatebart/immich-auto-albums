@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { copyFile, readFile, rename, writeFile } from 'node:fs/promises';
 import { fromToml, toToml } from '$core/config.js';
 import type { Config } from '$core/types.js';
-import { configPath, invalidate, PreviewError } from './preview';
+import { configPath, invalidate, missingConfig, PreviewError } from './preview';
 
 export { validateConfig } from '$core/validate.js';
 export type { ConfigIssue } from '$core/schema.js';
@@ -16,8 +16,8 @@ export async function readConfigFile() {
 	try {
 		text = await readFile(file, 'utf8');
 	} catch (e) {
-		const missing = (e as NodeJS.ErrnoException).code === 'ENOENT';
-		throw new PreviewError(missing ? 404 : 500, `cannot read ${file}: ${(e as Error).message}`);
+		if ((e as NodeJS.ErrnoException).code === 'ENOENT') throw new PreviewError(404, missingConfig(file));
+		throw new PreviewError(500, `cannot read ${file}: ${(e as Error).message}`);
 	}
 	try {
 		return { file, text, etag: etagOf(text), config: fromToml(text) };

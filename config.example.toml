@@ -1,0 +1,69 @@
+# Starting point for config.toml. Copy it, then edit:
+#     cp config.example.toml config.toml
+# config.toml is gitignored because homes and household names are personal.
+# Dates are TOML dates (YYYY-MM-DD). The API key is NOT here: pass IMMICH_API_KEY in the environment.
+# Every key, its range and its meaning are also in config.schema.json.
+
+[immich]
+url = "http://localhost:2283"
+out_dir = "."                                   # logs and decision CSVs
+window_days = 365                               # rolling recompute window; WINDOW_DAYS env overrides
+marker = "[auto-albums]"                        # album description prefix; only tagged albums are ever touched
+
+[people]
+# Names must match Immich's People page exactly, accents included.
+me = "Your Name"
+household = ["Your Name", "Your Partner"]
+with_share = 0.4          # share of a trip's face-tagged photos a guest must appear in to be named
+with_min_tagged = 5       # minimum face-tagged photos before naming anyone
+max_named = 3
+no_people_places = []     # places whose albums never name anyone, for example ["Home Village"]
+# Optional quiet period. Set both or neither.
+# no_people_from = 2023-06-01
+# no_people_to = 2023-07-31
+
+# Homes, in chronological order. Each applies until the next one starts.
+# Coordinates only need to be close: home_km below decides what counts as home.
+[[homes]]
+from = 2010-01-01
+lat = 48.857
+lon = 2.352
+label = "Paris"
+
+[clustering]
+home_km = 20              # photos within this radius of the current home are at home
+place_km = 5              # groups photos around a running centroid before naming a place
+merge_label_km = 15       # merges nearby groups before picking the album name
+dominant_share = 0.75     # share of a trip's GPS photos one place needs to name the album
+trip_gap_hours = 72       # a longer gap starts a new trip
+trip_min_photos = 10
+trip_min_days = 2         # fewer days and the cluster is considered for a day trip
+daytrip_min_photos = 15
+gather_gap_hours = 2
+gather_min_photos = 30
+gather_min_guests = 3     # named faces at home who are not household
+
+[person_years]
+min_photos = 50
+household_min_photos = 10
+
+[seasons]
+no_gps_era_end = 2012-03-01   # seasonal buckets only for GPS-less photos before this date
+min_photos = 5
+
+# Geocoder label -> name used in albums. Applies to cities and states.
+[aliases]
+"City of Westminster" = "London"
+"Manhattan" = "New York City"
+
+# Hand-declared events: every photo in the inclusive range, GPS or not.
+# [[events]]
+# name = "Our wedding"
+# from = 2019-08-30
+# to = 2019-09-01
+
+# Rename generated albums by kind and key prefix (key = first photo date, shown in the preview).
+# [[overrides]]
+# kind = "trip"
+# key_prefix = "2020-08"
+# name = "Around Lake Michigan 2020"

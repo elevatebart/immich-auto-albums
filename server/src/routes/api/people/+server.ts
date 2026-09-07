@@ -1,18 +1,18 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
-import { loadConfig } from '$core/config.js';
 import { fixtureAssets } from '$lib/server/fixture';
-import { configPath, immichClient, PreviewError } from '$lib/server/preview';
+import { immichClient, PreviewError, readConfig } from '$lib/server/preview';
 import type { RequestHandler } from './$types';
 
 /** Named people, for the household and "me" pickers. Fixture names when there is no Immich. */
 export const GET: RequestHandler = async () => {
 	try {
+		const cfg = await readConfig();
 		if (!env.IMMICH_API_KEY && env.DEMO === '1') {
-			const names = new Set(fixtureAssets(new Date()).flatMap((a) => [...a.people]));
+			const names = new Set(fixtureAssets(new Date(), cfg).flatMap((a) => [...a.people]));
 			return json({ source: 'fixture', people: [...names].sort().map((name) => ({ id: name, name })) });
 		}
-		const client = immichClient(await loadConfig(configPath()));
+		const client = immichClient(cfg);
 		const people = await client.fetchPeople();
 		return json({
 			source: 'immich',

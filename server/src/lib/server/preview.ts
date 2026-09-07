@@ -23,6 +23,20 @@ export class PreviewError extends Error {
 /** Config path is relative to the process cwd, which is server/ in dev and in the adapter-node build. */
 export const configPath = () => path.resolve(env.CONFIG ?? '../config.toml');
 
+export const missingConfig = (file: string) =>
+	`no config at ${file}. Copy config.example.toml to config.toml, or set CONFIG.`;
+
+/** Same 404 and the same hint wherever the config is read. */
+export async function readConfig(): Promise<Config> {
+	const file = configPath();
+	try {
+		return await loadConfig(file);
+	} catch (e) {
+		const missing = (e as NodeJS.ErrnoException).code === 'ENOENT';
+		throw new PreviewError(missing ? 404 : 500, missing ? missingConfig(file) : `${file} is not valid: ${(e as Error).message}`);
+	}
+}
+
 /** The wire preview plus the actions behind it, which keep the asset ids apply needs. */
 export interface Computed {
 	data: Preview;
@@ -64,7 +78,7 @@ async function fromImmich(cfg: Config, now: Date, windowDays: number): Promise<S
 }
 
 function fromFixture(cfg: Config, now: Date): Snapshot {
-	const assets = fixtureAssets(now);
+	const assets = fixtureAssets(now, cfg);
 	const names = new Set(assets.flatMap((a) => [...a.people]));
 	return { source: 'fixture', assets, albums: fixtureAlbums(cfg, assets, now), people: names.size };
 }
@@ -96,7 +110,7 @@ const tokenOf = (rows: PreviewRow[]) =>
 		.slice(0, 16);
 
 async function compute(): Promise<Computed> {
-	const cfg = await loadConfig(configPath());
+	const cfg = await readConfig();
 	const now = new Date();
 	const windowDays = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
 	if (!env.IMMICH_API_KEY && env.DEMO !== '1') {

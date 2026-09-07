@@ -5,7 +5,7 @@ import { plan, planFixedEvents, planTrips, makeContext } from "../src/planner.js
 import { reconcile } from "../src/reconcile.js";
 import type { Asset, ManagedAlbum } from "../src/types.js";
 
-const cfg = fromToml(readFileSync(new URL("../config.toml", import.meta.url), "utf8"));
+const cfg = fromToml(readFileSync(new URL("./fixtures/config.toml", import.meta.url), "utf8"));
 const NOW = new Date("2026-09-04T12:00:00Z");
 const H = 3_600_000;
 
@@ -20,7 +20,7 @@ describe("rule engines", () => {
   it("names a trip, folds GPS-less photos in, names guests from face-tagged share", () => {
     const b = new Date("2026-08-10T10:00:00Z");
     const A = [
-      ...burst(b, 12, 6, (t, i) => mk(t, 45.9, 6.13, "Annecy", "AURA", "France", i < 8 ? ["Sébastien Ledoux", "Alice Martin"] : ["Sébastien Ledoux"])),
+      ...burst(b, 12, 6, (t, i) => mk(t, 45.9, 6.13, "Annecy", "AURA", "France", i < 8 ? ["Theo Rivers", "Alice Martin"] : ["Theo Rivers"])),
       ...burst(b, 20, 3, (t) => mk(t, null, null, null)),
     ];
     const { plans, absorbed } = plan(cfg, A, { now: NOW });
@@ -34,14 +34,14 @@ describe("rule engines", () => {
     const A = [
       ...burst(new Date("2026-07-04T09:00:00Z"), 16, 1 / 3, (t) => mk(t, 45.76, 4.84, "Lyon")),
       ...burst(new Date("2026-06-21T18:00:00Z"), 32, 1 / 12, (t) => mk(t, 45.19, 5.72, "Grenoble", null, "France", ["Alice Martin", "Bob Roy", "Cara Li"])),
-      ...burst(new Date("2026-05-01T00:00:00Z"), 5, 24, (t) => mk(t, 45.19, 5.72, "Grenoble", null, "France", ["Dimitri Ledoux"])),
+      ...burst(new Date("2026-05-01T00:00:00Z"), 5, 24, (t) => mk(t, 45.19, 5.72, "Grenoble", null, "France", ["Nadia Rivers"])),
       ...burst(new Date("2004-07-15T00:00:00Z"), 6, 24, (t) => mk(t, null, null, null)),
     ];
     const names = plan(cfg, A, { now: NOW }).plans.map((p) => `${p.kind}|${p.name}|${p.ids.length}`);
     expect(names).toContain("daytrip|Lyon, 04 Jul 2026|16");
     expect(names).toContain("gathering|Gathering at home, 21 Jun 2026|32");
     expect(names).toContain("season|Summer 2004|6");
-    expect(names.some((n) => n.startsWith("person|Dimitri 2026"))).toBe(false); // 5 < household min 10
+    expect(names.some((n) => n.startsWith("person|Nadia 2026"))).toBe(false); // 5 < household min 10
   });
 
   it("place hierarchy: village merge, state, country, two countries, no-people places", () => {

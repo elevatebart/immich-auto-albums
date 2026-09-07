@@ -26,13 +26,15 @@ const mk = (
 const burst = (start: Date, n: number, stepH: number, f: (t: Date, i: number) => Asset) =>
 	Array.from({ length: n }, (_, i) => f(new Date(start.getTime() + i * stepH * H), i));
 
-export function fixtureAssets(now: Date): Asset[] {
+/** Household names come from the config, so the demo produces the same album kinds as a real run. */
+export function fixtureAssets(now: Date, cfg: Config): Asset[] {
 	seq = 0;
 	const ago = (days: number) => new Date(now.getTime() - days * DAY);
+	const [first = cfg.people.me, second = cfg.people.me] = cfg.people.household;
 	return [
 		// Annecy trip, plus GPS-less photos the planner should absorb into it.
 		...burst(ago(30), 12, 6, (t, i) =>
-			mk(t, 45.9, 6.13, 'Annecy', i < 8 ? ['Sébastien Ledoux', 'Alice Martin'] : ['Sébastien Ledoux'])
+			mk(t, 45.9, 6.13, 'Annecy', i < 8 ? [first, 'Alice Martin'] : [first])
 		),
 		...burst(ago(30), 20, 3, (t) => mk(t, null, null, null)),
 		// Two day trips.
@@ -43,7 +45,7 @@ export function fixtureAssets(now: Date): Asset[] {
 			mk(t, 45.19, 5.72, 'Grenoble', ['Alice Martin', 'Bob Roy', 'Cara Li'])
 		),
 		// Household member, spread over the year, to trigger a person-year album.
-		...burst(ago(200), 12, 24 * 7, (t) => mk(t, 45.19, 5.72, 'Grenoble', ['Dimitri Ledoux']))
+		...burst(ago(200), 12, 24 * 7, (t) => mk(t, 45.19, 5.72, 'Grenoble', [second]))
 	];
 }
 

@@ -5,13 +5,18 @@ import { configSchema, schemaField } from "../src/schema.js";
 import { validateConfig } from "../src/validate.js";
 import type { Config } from "../src/types.js";
 
-const cfg = fromToml(readFileSync(new URL("../config.toml", import.meta.url), "utf8"));
+const cfg = fromToml(readFileSync(new URL("./fixtures/config.toml", import.meta.url), "utf8"));
 const clone = () => structuredClone(cfg) as Config;
 const fields = (raw: unknown) => validateConfig(raw).issues.map((i) => i.field);
 
 describe("configSchema", () => {
-  it("accepts the shipped config", () => {
+  it("accepts the test config", () => {
     expect(validateConfig(cfg).issues).toEqual([]);
+  });
+
+  it("accepts config.example.toml, the file users start from", () => {
+    const example = fromToml(readFileSync(new URL("../config.example.toml", import.meta.url), "utf8"));
+    expect(validateConfig(example).issues).toEqual([]);
   });
 
   it("matches the generated config.schema.json", () => {
@@ -73,7 +78,7 @@ describe("configSchema", () => {
 
 describe("fromToml", () => {
   it("throws with the offending field", () => {
-    const text = readFileSync(new URL("../config.toml", import.meta.url), "utf8").replace(
+    const text = readFileSync(new URL("./fixtures/config.toml", import.meta.url), "utf8").replace(
       "home_km = 20",
       "home_km = 900",
     );
