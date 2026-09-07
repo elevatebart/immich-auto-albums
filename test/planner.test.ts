@@ -87,6 +87,24 @@ describe("rule engines", () => {
     expect(windowed).toEqual(["person|Nadia 2026", "daytrip|Lyon, 04 Jul 2026"]);
   });
 
+  it("all scope reaches past the window for trips and person years too", () => {
+    const old = new Date("2019-06-01T09:00:00Z");
+    const A = [
+      ...burst(old, 14, 6, (t) => mk(t, 45.9, 6.13, "Annecy", "AURA", "France", ["Alice Martin"])),
+      ...burst(new Date("2019-03-01T00:00:00Z"), 60, 24 * 4, (t) => mk(t, 45.19, 5.72, "Grenoble", null, "France", ["Alice Martin"])),
+    ];
+    const names = (scope: "window" | "all") =>
+      plan(cfg, A, { now: NOW, scope }).plans.map((p) => `${p.kind}|${p.name}`);
+    // A 365 day window ends in 2025, so nothing here is planned.
+    expect(names("window")).toEqual([]);
+    // The Grenoble burst runs into the fixture's wedding range, so that event lands too.
+    expect(names("all")).toEqual([
+      "person|Alice 2019",
+      "trip|Annecy with Alice, Jun 2019",
+      "event|Our wedding, Aug 2019",
+    ]);
+  });
+
   it("fetches face tags further back than it plans person years", () => {
     const ctx = makeContext(cfg, NOW, 365, "window");
     // Only 2026 is inside the window in full, but London in Sep 2025 still needs its faces.

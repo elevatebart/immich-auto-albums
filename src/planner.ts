@@ -165,7 +165,9 @@ export function makeContext(
   windowDays = cfg.immich.windowDays,
   scope: Scope = "all",
 ): PlanContext {
-  return { cfg, now, windowStart: new Date(now.getTime() - windowDays * 24 * HOUR), scope, absorbed: new Set() };
+  // "all" means no window at all, so trips and gatherings reach back as far as the library does.
+  const windowStart = scope === "all" ? new Date(0) : new Date(now.getTime() - windowDays * 24 * HOUR);
+  return { cfg, now, windowStart, scope, absorbed: new Set() };
 }
 
 /** A person year, season or event is planned only when the window holds all of it. */
@@ -254,7 +256,12 @@ export function planPersonYears(ctx: PlanContext, assets: Asset[]): Plan[] {
   const { cfg } = ctx;
   const hh = new Set(cfg.people.household);
   const plans: Plan[] = [];
-  for (const year of yearsCovered(ctx)) {
+  // Without a window, the years to consider come from the library rather than from the window's reach.
+  const years =
+    ctx.scope === "all"
+      ? [...new Set(assets.map((a) => a.t.getUTCFullYear()))].sort()
+      : yearsCovered(ctx);
+  for (const year of years) {
     const per = new Map<string, string[]>();
     for (const a of assets) {
       if (a.t.getUTCFullYear() !== year) continue;
