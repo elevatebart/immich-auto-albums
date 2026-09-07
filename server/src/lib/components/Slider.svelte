@@ -19,8 +19,21 @@
 	const id = $props.id();
 </script>
 
-<div class="grid grid-cols-1 gap-x-4 py-1 sm:grid-cols-[16rem_1fr_9rem] sm:items-center">
-	<Label for={id} {label} size="small" />
+<div class="flex flex-col gap-1 py-2">
+	<div class="flex items-center justify-between gap-3">
+		<Label for={id} {label} size="small" />
+		<div class="flex w-28 items-center gap-1">
+			<NumberInput
+				bind:value
+				size="small"
+				min={meta.minimum}
+				max={meta.maximum}
+				{step}
+				aria-label={label}
+			/>
+			{#if unit}<Text color="muted" size="tiny" class="whitespace-nowrap">{unit}</Text>{/if}
+		</div>
+	</div>
 	<input
 		{id}
 		type="range"
@@ -28,21 +41,10 @@
 		max={meta.maximum}
 		{step}
 		bind:value
-		class="accent-primary h-6 w-full"
-		aria-label={label}
-	/>
-	<NumberInput
-		bind:value
-		size="small"
-		min={meta.minimum}
-		max={meta.maximum}
-		{step}
-		trailingText={unit}
+		class="accent-primary h-5 w-full"
 		aria-label={label}
 	/>
 	{#if issue || meta.description}
-		<div class="sm:col-start-2 sm:col-end-4">
-			<Text size="tiny" color={issue ? 'danger' : 'muted'}>{issue ?? meta.description}</Text>
-		</div>
+		<Text size="tiny" color={issue ? 'danger' : 'muted'}>{issue ?? meta.description}</Text>
 	{/if}
 </div>
