@@ -1,0 +1,14 @@
+.git
+.gitignore
+node_modules
+dist
+server/node_modules
+server/.svelte-kit
+server/build
+# Never bake the personal config into an image.
+config.toml
+config.toml.bak
+run_*.log
+decisions_*.csv
+plan_*.json
+.DS_Store

@@ -1,0 +1,16 @@
+# The UI. The monthly run is a DSM task, not a service: see README.md.
+services:
+  ui:
+    image: immich-auto-albums:latest
+    build:
+      context: .
+    command: serve
+    restart: unless-stopped
+    # So the container reaches Immich running on the same NAS.
+    network_mode: host
+    environment:
+      IMMICH_API_KEY: ${IMMICH_API_KEY:?set it in .env or the shell}
+      PORT: 3000
+    volumes:
+      # Holds config.toml, receives the logs and CSVs.
+      - /volume1/tools/immich-auto-albums:/data

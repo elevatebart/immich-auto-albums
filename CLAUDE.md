@@ -52,7 +52,13 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
    is cross-linked with the table through a focused row id.
 2. Done. `src/schema.ts` holds the schema, `config.schema.json` is the generated artifact for outside consumers, and
    the form takes every slider range and hint from it.
-3. Docker image for the NAS (`node:22-slim`), monthly run via DSM Task Scheduler as root.
+3. Done. `Dockerfile` has a `cli` target for the scheduled run and a default target that adds the UI, both on
+   `node:22-slim` with `/data` as the only mount. README has the DSM task. Cross-builds to amd64 for the NAS.
+
+## Docker
+- `cli` target: root deps plus `dist`. Default target adds `server/build` and the server deps.
+- `docker/entrypoint.sh` dispatches `preview`, `apply`, `serve`, anything else runs verbatim.
+- Never bake `config.toml` into an image: `.dockerignore` excludes it.
 
 ## Running
     npm ci && npm run build && npm test

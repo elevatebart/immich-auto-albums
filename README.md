@@ -17,4 +17,37 @@ Layout: `src/planner.ts` (pure, no I/O), `src/reconcile.ts` (pure), `src/config.
 `src/schema.ts` + `src/validate.ts` (JSON Schema and Ajv validation),
 `src/immich.ts` (fetch client), `src/cli.ts`. `test/` holds the golden cases ported from the Python version.
 
-Docker on the NAS: `docker run --rm --network host -e IMMICH_API_KEY=... -v /volume1/tools/immich-auto-albums:/app -w /app node:22-slim npm run preview`
+## Docker
+
+Two targets. `cli` is the monthly run, the default adds the UI.
+
+    docker build -t immich-auto-albums .                   # CLI + UI, 531 MB
+    docker build --target cli -t immich-auto-albums:cli .   # CLI only, 350 MB
+
+Building on a Mac for a Synology needs `--platform linux/amd64`. Both targets cross-build, or build on the
+NAS itself over SSH.
+
+`/data` is the only mount: it holds `config.toml` and receives `run_*.log`, `decisions_*.csv` and `plan_*.json`.
+The container runs as root so it can write to a NAS share.
+
+    docker run --rm --network host -e IMMICH_API_KEY=... \
+      -v /volume1/tools/immich-auto-albums:/data immich-auto-albums:cli preview
+    docker run --rm --network host -e IMMICH_API_KEY=... \
+      -v /volume1/tools/immich-auto-albums:/data immich-auto-albums:cli apply
+    docker run -d --network host -e IMMICH_API_KEY=... \
+      -v /volume1/tools/immich-auto-albums:/data immich-auto-albums serve   # UI on :3000
+
+`docker-compose.yml` runs the UI. `--network host` is there so the container reaches Immich on the NAS itself.
+
+## Monthly run on DSM
+
+1. Put the key in `/volume1/tools/immich-auto-albums/immich.env`, `chmod 600`: `IMMICH_API_KEY=...`
+2. Control Panel, Task Scheduler, Create, Scheduled Task, User-defined script. User `root`, monthly, day 1.
+3. Run command:
+
+       /usr/local/bin/docker run --rm --network host \
+         --env-file /volume1/tools/immich-auto-albums/immich.env \
+         -v /volume1/tools/immich-auto-albums:/data immich-auto-albums:cli apply
+
+Run it with `preview` once by hand first: it writes the same decision CSV without touching Immich. Enable the
+task's email notification to get the run log.
