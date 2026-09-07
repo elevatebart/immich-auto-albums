@@ -1,0 +1,8 @@
+node_modules/
+dist/
+server/.svelte-kit/
+server/build/
+run_*.log
+decisions_*.csv
+plan_*.json
+.DS_Store
