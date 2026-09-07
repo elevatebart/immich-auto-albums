@@ -361,7 +361,13 @@
 			{/if}
 
 			{#if shown}
-				<div class:opacity-60={recomputing}>
+				{#if scanning}
+					<Text color="muted" size="small">
+						Rescanning the library. These rows are the previous scan until it lands, which takes a
+						while on a big library.
+					</Text>
+				{/if}
+				<div class:opacity-60={recomputing || scanning}>
 					<AlbumsPanel
 						preview={shown}
 						{selected}
