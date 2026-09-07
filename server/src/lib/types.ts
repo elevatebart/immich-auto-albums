@@ -1,4 +1,4 @@
-import type { PlanKind } from '$core/types.js';
+import type { Config, PlanKind } from '$core/types.js';
 
 /** One reconcile action, flattened for the wire. Asset ids stay server side; only counts travel. */
 export interface PreviewRow {
@@ -67,4 +67,26 @@ export interface ApplyResponse {
 	applied: number;
 	failed: number;
 	results: ApplyResult[];
+}
+
+export interface ConfigResponse {
+	file: string;
+	/** Digest of the file on disk. PUT refuses a stale one. */
+	etag: string;
+	config: Config;
+	toml: string;
+}
+
+export interface ConfigWriteRequest {
+	etag: string;
+	config: unknown;
+	/** Validate and render the file without writing it. */
+	dryRun?: boolean;
+}
+
+export interface ConfigWriteResponse extends ConfigResponse {
+	dryRun: boolean;
+	/** Legal changes worth reading twice, such as a new marker. */
+	warnings: string[];
+	backup?: string;
 }

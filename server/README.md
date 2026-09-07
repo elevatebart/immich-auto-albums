@@ -19,13 +19,23 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   preview rows, so a plan that moved since the caller looked at it is rejected with 409 rather than written blind;
   a missing `confirm` is 400. `ids` narrows the write to those rows, omitted means every changed row. One failed
   row does not stop the others. Writes invalidate the cache. Under `DEMO=1` it reports `dryRun: true` and writes nothing.
+- `GET /api/config` -> `ConfigResponse`: the parsed `Config`, the file text and an etag.
+- `PUT /api/config` -> `ConfigWriteResponse`. Body: `{ etag, config, dryRun? }`. Replaces the file wholesale, so it
+  takes the etag from GET and answers 409 when the file moved underneath. Every field is validated and all problems
+  come back at once as `issues[{field, message}]` with 400. `dryRun` renders the TOML and the warnings without
+  writing. A write copies the old file to `config.toml.bak`, writes through a temp file in the same directory, then
+  renames, and drops the preview cache. `warnings` covers legal but costly edits, such as a new marker orphaning
+  the albums tagged with the old one.
 - `/`: the preview table, with kind filter, unchanged-rows toggle, per-row checkboxes and a confirm panel that
   spells out the counts before anything is written.
 
 `$core` is an alias for `../src`, so the pure `planner.ts`, `reconcile.ts` and `config.ts` are imported
 as source and bundled by Vite. No copy, no build step in the parent.
 
-Not here yet: config editing, the people picker, the Leaflet map.
+Config values are camelCase on the wire and snake_case in the file; `toToml` owns that mapping and regenerates the
+explanatory comments from a template, so a UI write leaves the file as readable as a hand-edited one.
+
+Not here yet: the config form itself, the people picker, the Leaflet map.
 
 There is no auth in front of any of this, so bind it to the LAN.
 

@@ -6,13 +6,15 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 ## Layout
 - `src/planner.ts`: pure, no I/O. `plan(cfg, assets, opts) -> { plans, absorbed }`. Every rule is a `planX(ctx, assets)` function.
 - `src/reconcile.ts`: pure. `reconcile(plans, managedAlbums) -> Action[]` (create | update | noop). Handles user renames.
-- `src/config.ts`: `config.toml` -> `Config`. TOML keys are snake_case, `Config` is camelCase.
+- `src/config.ts`: `config.toml` -> `Config` (`fromToml`) and back (`toToml`, canonical, comments from a fixed
+  template). TOML keys are snake_case, `Config` is camelCase.
 - `src/immich.ts`: fetch client for the Immich REST API (`x-api-key` header, `/api` prefix).
 - `src/cli.ts`: `preview` and `apply`. Writes `run_*.log`, `decisions_*.csv`, `plan_*.json` to `out_dir`.
 - `server/`: SvelteKit UI. Imports `src/` through the `$core` alias (`server/vite.config.ts`).
   `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire types. `GET /api/preview` and
-  `POST /api/apply` exist; apply needs the preview token plus `confirm: true`, and `src/lib/server/apply.ts` is the only
-  path that mutates Immich. No config editing yet. `DEMO=1` swaps in a fixture library and makes apply a dry run.
+  `POST /api/apply` and `GET`/`PUT /api/config` exist. Apply needs the preview token plus `confirm: true`, and
+  `apply.ts` is the only path that mutates Immich. Config writes need the file etag, are validated field by field in
+  `config-io.ts`, keep a `.bak` and swap through a temp file. `DEMO=1` swaps in a fixture library, apply then dry runs.
 - `test/planner.test.ts`: golden cases. Run `npm test` before and after any planner change.
 
 ## Invariants

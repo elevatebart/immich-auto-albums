@@ -59,3 +59,107 @@ export function fromToml(text: string): Config {
 export async function loadConfig(path: string): Promise<Config> {
   return fromToml(await readFile(path, "utf8"));
 }
+
+const q = (s: string) => JSON.stringify(s);
+const list = (xs: string[]) => `[${xs.map(q).join(", ")}]`;
+
+/** Canonical config.toml for a Config. The comments are this template's, not the input file's. */
+export function toToml(c: Config): string {
+  const out: string[] = [];
+  const row = (k: string, v: string | number, comment?: string) => {
+    const kv = `${k} = ${v}`;
+    out.push(comment ? `${kv.padEnd(31)} # ${comment}` : kv);
+  };
+  const head = (s: string) => out.push("", s);
+
+  out.push(
+    "# immich_auto_albums configuration. Dates are TOML dates (YYYY-MM-DD).",
+    "# The API key is NOT here: pass IMMICH_API_KEY in the environment.",
+  );
+  head("[immich]");
+  row("url", q(c.immich.url));
+  row("out_dir", q(c.immich.outDir), "logs and decision CSVs");
+  row("window_days", c.immich.windowDays, "rolling recompute window; WINDOW_DAYS env overrides");
+  row("marker", q(c.immich.marker), "album description prefix; only tagged albums are ever touched");
+
+  head("[people]");
+  row("me", q(c.people.me));
+  row("household", list(c.people.household));
+  row("with_share", c.people.withShare, "share of a trip's face-tagged photos a guest must appear in to be named");
+  row("with_min_tagged", c.people.withMinTagged, "minimum face-tagged photos before naming anyone");
+  row("max_named", c.people.maxNamed);
+  if (c.people.noPeopleFrom && c.people.noPeopleTo) {
+    row("no_people_from", c.people.noPeopleFrom, 'trips starting in this range never get "with ..."');
+    row("no_people_to", c.people.noPeopleTo);
+  }
+  row("no_people_places", list(c.people.noPeoplePlaces));
+
+  head("# Homes, in chronological order. Each applies until the next one starts.");
+  for (const h of c.homes) {
+    out.push("[[homes]]");
+    row("from", h.from);
+    row("lat", h.lat);
+    row("lon", h.lon);
+    if (h.label) row("label", q(h.label));
+    out.push("");
+  }
+  out.pop();
+
+  head("[clustering]");
+  for (const [k, v] of [
+    ["home_km", c.clustering.homeKm],
+    ["place_km", c.clustering.placeKm],
+    ["merge_label_km", c.clustering.mergeLabelKm],
+    ["dominant_share", c.clustering.dominantShare],
+    ["trip_gap_hours", c.clustering.tripGapHours],
+    ["trip_min_photos", c.clustering.tripMinPhotos],
+    ["trip_min_days", c.clustering.tripMinDays],
+    ["daytrip_min_photos", c.clustering.daytripMinPhotos],
+    ["gather_gap_hours", c.clustering.gatherGapHours],
+    ["gather_min_photos", c.clustering.gatherMinPhotos],
+    ["gather_min_guests", c.clustering.gatherMinGuests],
+  ] as [string, number][]) {
+    row(k, v);
+  }
+
+  head("[person_years]");
+  row("min_photos", c.personYears.minPhotos);
+  row("household_min_photos", c.personYears.householdMinPhotos);
+
+  head("[seasons]");
+  row("no_gps_era_end", c.seasons.noGpsEraEnd, "seasonal buckets only for GPS-less photos before this date");
+  row("min_photos", c.seasons.minPhotos);
+
+  const aliases = Object.entries(c.aliases);
+  if (aliases.length) {
+    head("# Geocoder label -> name used in albums. Applies to cities and states.");
+    out.push("[aliases]");
+    for (const [from, to] of aliases) row(q(from), q(to));
+  }
+
+  if (c.events.length) {
+    head("# Hand-declared events: every photo in the inclusive range, GPS or not.");
+    for (const e of c.events) {
+      out.push("[[events]]");
+      row("name", q(e.name));
+      row("from", e.from);
+      row("to", e.to);
+      out.push("");
+    }
+    out.pop();
+  }
+
+  if (c.overrides.length) {
+    head("# Rename generated albums by kind and key prefix (key = first photo date, printed in the log).");
+    for (const o of c.overrides) {
+      out.push("[[overrides]]");
+      row("kind", q(o.kind));
+      row("key_prefix", q(o.keyPrefix));
+      row("name", q(o.name));
+      out.push("");
+    }
+    out.pop();
+  }
+
+  return out.join("\n") + "\n";
+}
