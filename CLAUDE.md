@@ -54,6 +54,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - The API key comes from `IMMICH_API_KEY` only. Never write it to config or logs.
 - Immich API facts verified against the OpenAPI spec: `POST /search/metadata` (page/size/withExif/visibility/personIds/takenAfter as full ISO datetime),
   `GET /people?withHidden=false&page&size`, `GET /people/{id}/thumbnail` (octet-stream),
+  `POST /search/metadata` with `albumIds` for an album's asset ids: `AlbumResponseDto` carries only `assetCount`,
+  `GET /albums/{id}` does not return assets, and reading `detail.assets` silently yields an empty set, which makes
+  every trip-like album miss its match and get recreated.
   `GET /search/places?name=` (`{name, latitude, longitude, admin1name, admin2name}`),
   `GET /assets/{id}/thumbnail?size=thumbnail|preview` (needs `asset.view`), `GET/POST/PATCH /albums`,
   `PUT/DELETE /albums/{id}/assets`. Permissions needed:

@@ -77,20 +77,27 @@ export class ImmichClient {
     return counts;
   }
 
+  /** The album response carries only a count, so the ids come from a search. */
+  async albumAssetIds(id: string, count: number): Promise<Set<string>> {
+    const ids = new Set<string>();
+    if (!count) return ids;
+    for await (const a of this.search({ albumIds: [id] })) ids.add(a.id);
+    return ids;
+  }
+
   async fetchManagedAlbums(marker: string): Promise<ManagedAlbum[]> {
     const albums: any[] = (await this.api("GET", "/albums")) ?? [];
     const out: ManagedAlbum[] = [];
     for (const al of albums) {
       const meta = parseDescription(marker, al.albumName, al.description);
       if (!meta) continue;
-      const detail = await this.api("GET", `/albums/${al.id}`);
       out.push({
         id: al.id,
         name: al.albumName,
         auto: meta.auto,
         kind: meta.kind,
         key: meta.key,
-        assets: new Set((detail.assets ?? []).map((a: any) => a.id)),
+        assets: await this.albumAssetIds(al.id, al.assetCount ?? 0),
       });
     }
     return out;

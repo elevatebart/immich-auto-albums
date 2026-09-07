@@ -340,14 +340,15 @@ def load_auto_albums():
         head, _, tail = d.partition("\n")
         meta = dict(kv.split("=", 1) for kv in head[len(MARKER):].split() if "=" in kv)
         auto = tail[len("auto: "):] if tail.startswith("auto: ") else al["albumName"]
-        found.append({"id": al["id"], "name": al["albumName"], "auto": auto, "kind": meta.get("kind"), "key": meta.get("key"), "assets": None})
+        found.append({"id": al["id"], "name": al["albumName"], "auto": auto, "kind": meta.get("kind"),
+                      "key": meta.get("key"), "count": al.get("assetCount") or 0, "assets": None})
     return found
 
 
 def album_assets(al):
+    """The album response carries only a count, so the ids come from a search."""
     if al["assets"] is None:
-        detail = api("GET", f"/albums/{al['id']}")
-        al["assets"] = {a["id"] for a in detail.get("assets", [])}
+        al["assets"] = set() if not al["count"] else {a["id"] for a in search({"albumIds": [al["id"]]})}
     return al["assets"]
 
 
