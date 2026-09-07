@@ -3,7 +3,7 @@ import path from 'node:path';
 import { env } from '$env/dynamic/private';
 import { loadConfig } from '$core/config.js';
 import { ImmichClient } from '$core/immich.js';
-import { dayOf, makeContext, plan, taggedSince } from '$core/planner.js';
+import { dayOf, makeContext, plan } from '$core/planner.js';
 import { reconcile } from '$core/reconcile.js';
 import type { Action, Asset, Config, ManagedAlbum, Scope } from '$core/types.js';
 import type { Preview, PreviewRow } from '$lib/types';
@@ -54,6 +54,8 @@ interface Snapshot {
 	people: number;
 	/** Frozen so a re-plan of the same library lands on the same window. */
 	now: Date;
+	/** How far back the fetch reached. null is the whole library. Nothing older than this exists here. */
+	since: Date | null;
 }
 
 export function immichClient(cfg: Config): ImmichClient {
@@ -61,7 +63,7 @@ export function immichClient(cfg: Config): ImmichClient {
 	return new ImmichClient(env.IMMICH_URL ?? cfg.immich.url, env.IMMICH_API_KEY);
 }
 
-async function fromImmich(cfg: Config, now: Date, windowDays: number, scope: Scope): Promise<Snapshot> {
+async function fromImmich(cfg: Config, now: Date, since: Date | null): Promise<Snapshot> {
 	const client = immichClient(cfg);
 	try {
 		await client.checkAuth();
@@ -69,23 +71,24 @@ async function fromImmich(cfg: Config, now: Date, windowDays: number, scope: Sco
 		const url = env.IMMICH_URL ?? cfg.immich.url;
 		throw new PreviewError(502, `Immich at ${url} is unreachable or rejected the API key: ${(e as Error).message}`);
 	}
-	const ctx = makeContext(cfg, now, windowDays, scope);
-	const assets = await client.fetchAssets(scope === 'window' ? ctx.windowStart : undefined);
+	const assets = await client.fetchAssets(since ?? undefined);
 	const people = await client.fetchPeople();
-	await client.attachPeople(assets, people, taggedSince(ctx));
+	// Face tags reach a year further back than the assets, so a trip near the edge keeps its guests.
+	await client.attachPeople(assets, people, (since ?? new Date(0)).getUTCFullYear());
 	return {
 		source: 'immich',
 		assets: [...assets.values()],
 		albums: await client.fetchManagedAlbums(cfg.immich.marker),
 		people: people.length,
-		now
+		now,
+		since
 	};
 }
 
 function fromFixture(cfg: Config, now: Date): Snapshot {
 	const assets = fixtureAssets(now, cfg);
 	const names = new Set(assets.flatMap((a) => [...a.people]));
-	return { source: 'fixture', assets, albums: fixtureAlbums(cfg, assets, now), people: names.size, now };
+	return { source: 'fixture', assets, albums: fixtureAlbums(cfg, assets, now), people: names.size, now, since: null };
 }
 
 export const rowId = (a: Action) => `${a.plan.kind}:${a.plan.key}`;
@@ -118,13 +121,20 @@ const tokenOf = (rows: PreviewRow[]) =>
 		.digest('hex')
 		.slice(0, 16);
 
-async function readSnapshot(cfg: Config, scope: Scope): Promise<Snapshot> {
+/** How far back a plan for this config needs the library. null means the whole thing. */
+function reachOf(cfg: Config, scope: Scope, now: Date): Date | null {
+	if (scope === 'all') return null;
+	const windowDays = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
+	return makeContext(cfg, now, windowDays, scope).windowStart;
+}
+
+async function readSnapshot(since: Date | null): Promise<Snapshot> {
 	const now = new Date();
 	if (!env.IMMICH_API_KEY && env.DEMO !== '1') {
 		throw new PreviewError(503, 'IMMICH_API_KEY is not set. Set it, or run with DEMO=1 for the fixture library.');
 	}
-	const windowDays = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
-	return env.IMMICH_API_KEY ? await fromImmich(cfg, now, windowDays, scope) : fromFixture(cfg, now);
+	const cfg = await readConfig();
+	return env.IMMICH_API_KEY ? await fromImmich(cfg, now, since) : fromFixture(cfg, now);
 }
 
 /** Plan and reconcile over a snapshot already in memory. Microseconds, so a draft config is cheap. */
@@ -132,7 +142,11 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 	// The fixture reads the config, so rebuild it for a draft rather than showing stale names.
 	const snap = snapshot.source === 'fixture' ? fromFixture(cfg, snapshot.now) : snapshot;
 	const now = snap.now;
-	const windowDays = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
+	// Never plan past what the snapshot holds: a window reaching further back would see a truncated
+	// year and ask reconcile to strip the missing photos out of an album a full run had created.
+	const asked = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
+	const reach = snap.since ? (now.getTime() - snap.since.getTime()) / (24 * 3_600_000) : asked;
+	const windowDays = scope === 'all' ? asked : Math.min(asked, reach);
 	const { plans, absorbed } = plan(cfg, snap.assets, { now, windowDays, scope });
 	const actions = reconcile(plans, snap.albums);
 	const rows = actions.map(rowOf);
@@ -170,41 +184,51 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 	};
 }
 
-/** One entry per scope: the windowed scan fetches less, so the two are not interchangeable. */
-const cached = new Map<Scope, { at: number; value: Snapshot }>();
-const inflight = new Map<Scope, Promise<Snapshot>>();
+/** One snapshot at a time, with the reach it was fetched for. */
+let cached: { at: number; value: Snapshot } | null = null;
+let inflight: { since: Date | null; run: Promise<Snapshot> } | null = null;
 
-/** A library scan is slow, so hold the last one per scope and coalesce concurrent requests. */
-async function getSnapshot(scope: Scope, refresh = false): Promise<Snapshot> {
-	const hit = cached.get(scope);
-	if (!refresh && hit && Date.now() - hit.at < TTL_MS) return hit.value;
-	if (!inflight.has(scope)) {
-		inflight.set(
-			scope,
-			readConfig()
-				.then((cfg) => readSnapshot(cfg, scope))
-				.then((value) => {
-					cached.set(scope, { at: Date.now(), value });
-					return value;
-				})
-				.finally(() => inflight.delete(scope))
-		);
+const holds = (snap: Snapshot, since: Date | null) =>
+	snap.since === null || (since !== null && since.getTime() >= snap.since.getTime());
+
+/**
+ * A library scan is slow, so hold the last one. A plan that needs the library further back than the
+ * snapshot reaches gets a fresh one; a shorter reach reuses it, since the planner filters anyway.
+ */
+async function getSnapshot(since: Date | null, refresh = false): Promise<Snapshot> {
+	if (!refresh && cached && Date.now() - cached.at < TTL_MS && holds(cached.value, since)) {
+		return cached.value;
 	}
-	return inflight.get(scope)!;
+	if (!inflight || !holds({ since: inflight.since } as Snapshot, since)) {
+		const run = readSnapshot(since)
+			.then((value) => {
+				cached = { at: Date.now(), value };
+				return value;
+			})
+			.finally(() => {
+				if (inflight?.run === run) inflight = null;
+			});
+		inflight = { since, run };
+	}
+	return inflight.run;
 }
 
 /** The plan for the config on disk. This is the only one apply will write. */
 export async function getComputed(scope: Scope = 'window', refresh = false): Promise<Computed> {
 	const cfg = await readConfig();
-	return planWith(await getSnapshot(scope, refresh), cfg, false, scope);
+	const snap = await getSnapshot(reachOf(cfg, scope, new Date()), refresh);
+	return planWith(snap, cfg, false, scope);
 }
 
-/** The plan for an unsaved config, over the cached library. */
+/** The plan for an unsaved config. It may need the library further back than the saved one does. */
 export async function getDraft(cfg: Config, scope: Scope = 'window'): Promise<Computed> {
-	return planWith(await getSnapshot(scope), cfg, true, scope);
+	const snap = await getSnapshot(reachOf(cfg, scope, new Date()));
+	return planWith(snap, cfg, true, scope);
 }
 
 export const getPreview = (scope: Scope = 'window', refresh = false) =>
 	getComputed(scope, refresh).then((c) => c.data);
 
-export const invalidate = () => cached.clear();
+export const invalidate = () => {
+	cached = null;
+};

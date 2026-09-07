@@ -52,7 +52,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   override a generated name: there is no config key for it.
 - Event kinds (trip, daytrip, gathering) match existing albums by >=50% asset overlap within 45 days; person, season, event match by key.
 - In `window` scope a person year, season or fixed event is planned only when the window covers it in full, so a
-  partial slice can never strip photos out of an album that a full run created. Face tags are still fetched from
+  partial slice can never strip photos out of an album that a full run created. The server enforces the same rule
+  against its snapshot: a plan is clamped to how far back the fetch reached (`Snapshot.since`), and a draft asking
+  for more history refetches rather than planning over assets it does not have. Face tags are still fetched from
   `taggedSince(ctx)`, which reaches further back than the planned years: a trip needs its faces even when the year
   it sits in is not planned.
 - The API key comes from `IMMICH_API_KEY` only. Never write it to config or logs.

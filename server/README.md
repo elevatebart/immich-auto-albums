@@ -19,7 +19,8 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   rolling window. The window is the default everywhere, and the checkbox in the album header is the bypass.
 - `GET /api/preview` -> `Preview` (`src/lib/types.ts`): stats plus one row per reconcile action,
   with the create/update/rename/noop op, rename flags, asset counts and the cluster centroid. Asset ids stay
-  on the server. `?refresh=1` rescans the library, which is the only slow part and is cached for 10 minutes.
+  on the server. `?refresh=1` rescans the library, which is the only slow part and is cached for 10 minutes. The
+  snapshot records how far back it fetched; a longer window refetches, a shorter one reuses it.
 - `POST /api/preview` with `{ config }` -> the same shape for an unsaved config, planned over the cached
   library in a few milliseconds. It carries `draft: true` and no token, so apply can never write a plan
   that came from a config the file does not have.
