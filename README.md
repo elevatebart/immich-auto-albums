@@ -15,6 +15,31 @@ years, seasons and fixed events are planned only when the window covers them in 
 
 UI: `cd server && DEMO=1 npm run dev` for the preview table, the apply confirm and the config form (see `server/README.md`).
 
+## Rename an album in Immich, it sticks
+
+Every album the tool creates carries its identity in the description, not in the title:
+
+    [auto-albums] kind=trip key=2025-09-24
+    auto: London with Milos, Sep 2025
+
+Line 1 is the marker plus the plan's kind and key. Line 2 records the name the generator produced. Nothing matches on
+the title: the stable kinds (person, season, event) match on `key`, and trips, day trips and gatherings match on
+>=50% asset overlap within 45 days of that date. So renaming an album in Immich is safe. On the next run the tool
+finds it, sees that its title no longer equals the `auto:` line, and treats the title as yours: the decision log says
+`keeping your name`, the UI shows a `your name` badge, and photos keep being added and removed as usual while the
+title is left alone. Line 2 is still refreshed to whatever the generator would call it today, which is what keeps the
+rename recognised run after run.
+
+Two things to avoid:
+
+- Do not edit or remove the description. It is the only handle on the album. Without the marker line the album stops
+  being managed and the next run creates a second one alongside it.
+- Do not rename an album to exactly what the generator would call it. Title equal to `auto:` reads as "the tool owns
+  this name", so a later change to the generated name would move your title with it.
+
+There is no rename key in the config on purpose: this is the one mechanism, and it lives where you are already
+looking at the album.
+
 `config.schema.json` is the JSON Schema for the config, generated with `npm run schema`.
 
 `python/immich_auto_albums.py` is the original single-file version, stdlib only, reading the same `config.toml`.
