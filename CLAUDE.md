@@ -39,7 +39,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Event kinds (trip, daytrip, gathering) match existing albums by >=50% asset overlap within 45 days; person, season, event match by key.
 - The API key comes from `IMMICH_API_KEY` only. Never write it to config or logs.
 - Immich API facts verified against the OpenAPI spec: `POST /search/metadata` (page/size/withExif/visibility/personIds/takenAfter as full ISO datetime),
-  `GET /people?withHidden=false&page&size`, `GET/POST/PATCH /albums`, `PUT/DELETE /albums/{id}/assets`. Permissions needed:
+  `GET /people?withHidden=false&page&size`, `GET /people/{id}/thumbnail` (octet-stream), `GET/POST/PATCH /albums`,
+  `PUT/DELETE /albums/{id}/assets`. Permissions needed:
   asset.read, person.read, album.read, album.create, album.update, albumAsset.create, albumAsset.delete, user.read.
 
 ## Code style

@@ -14,7 +14,6 @@
 		IconButton,
 		Input,
 		Label,
-		MultiSelect,
 		NumberInput,
 		Select,
 		Stack,
@@ -24,6 +23,7 @@
 	import { PLAN_KINDS, schemaField, type ConfigIssue } from '$core/schema.js';
 	import type { Config } from '$core/types.js';
 	import HomesMap from '$lib/components/HomesMap.svelte';
+	import PeoplePicker from '$lib/components/PeoplePicker.svelte';
 	import Slider from '$lib/components/Slider.svelte';
 	import type { Person } from '$lib/types';
 
@@ -52,11 +52,6 @@
 	const today = () => new Date().toISOString().slice(0, 10);
 	const iss = (field: string) => issues.find((i) => i.field === field)?.message;
 	const hint = (field: string) => schemaField(field).description;
-	const peopleOptions = $derived(
-		[...new Set([...people.map((p) => p.name), ...config.people.household, config.people.me])]
-			.filter(Boolean)
-			.sort()
-	);
 
 	const addHome = () => config.homes.push(map?.addAtCenter() ?? { from: today(), lat: 46.5, lon: 4 });
 	const sortHomes = () => config.homes.sort((a, b) => a.from.localeCompare(b.from));
@@ -105,15 +100,22 @@
 		</CardHeader>
 		<CardBody>
 			<Stack gap={4}>
-				<Field label="Me" invalid={!!iss('people.me')}>
-					<Select bind:value={config.people.me} options={peopleOptions} placeholder="pick a person" />
-				</Field>
-				<Field
+				<PeoplePicker
+					label="Me"
+					description={hint('people.me')}
+					{people}
+					selected={config.people.me ? [config.people.me] : []}
+					multiple={false}
+					onchange={(names) => (config.people.me = names[0] ?? '')}
+				/>
+				{#if iss('people.me')}<Text color="danger" size="small">{iss('people.me')}</Text>{/if}
+				<PeoplePicker
 					label="Household"
 					description={hint('people.household')}
-				>
-					<MultiSelect bind:values={config.people.household} options={peopleOptions} />
-				</Field>
+					{people}
+					selected={config.people.household}
+					onchange={(names) => (config.people.household = names)}
+				/>
 				<Slider
 					label="Guest share of tagged photos"
 					field="people.withShare"

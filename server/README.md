@@ -26,6 +26,8 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   a missing `confirm` is 400. `ids` narrows the write to those rows, omitted means every changed row. One failed
   row does not stop the others. Writes invalidate the cache. Under `DEMO=1` it reports `dryRun: true` and writes nothing.
 - `GET /api/people` -> `PeopleResponse`: named people from Immich, for the household and "me" pickers.
+- `GET /api/people/<id>/thumbnail`: proxies Immich's person thumbnail so the key stays server side. The id must be
+  a UUID, anything else is 404, and the picker falls back to initials whenever the image does not load.
 - `GET /api/config` -> `ConfigResponse`: the parsed `Config`, the file text and an etag.
 - `PUT /api/config` -> `ConfigWriteResponse`. Body: `{ etag, config, dryRun? }`. Replaces the file wholesale, so it
   takes the etag from GET and answers 409 when the file moved underneath. Every field is validated and all problems
