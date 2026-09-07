@@ -305,14 +305,7 @@ export function planFixedEvents(ctx: PlanContext, assets: Asset[]): Plan[] {
   });
 }
 
-export function applyOverrides(cfg: Config, plans: Plan[]): Plan[] {
-  for (const p of plans) {
-    for (const o of cfg.overrides) if (o.kind === p.kind && p.key.startsWith(o.keyPrefix)) p.name = o.name;
-  }
-  return plans;
-}
-
-/** Full plan: every rule, overrides applied, sorted by start. */
+/** Full plan: every rule, sorted by start. */
 export function plan(
   cfg: Config,
   assets: Asset[],
@@ -326,7 +319,6 @@ export function plan(
     ...planSeasons(ctx, assets),
     ...planFixedEvents(ctx, assets),
   ];
-  applyOverrides(cfg, plans);
   plans.sort((x, y) => x.start.getTime() - y.start.getTime());
   return { plans, absorbed: ctx.absorbed };
 }

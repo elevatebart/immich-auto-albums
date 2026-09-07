@@ -23,12 +23,6 @@ export interface FixedEvent {
   to: string;
 }
 
-export interface NameOverride {
-  kind: PlanKind;
-  keyPrefix: string;
-  name: string;
-}
-
 export interface Config {
   immich: { url: string; outDir: string; windowDays: number; marker: string };
   people: {
@@ -57,7 +51,6 @@ export interface Config {
   seasons: { noGpsEraEnd: string; minPhotos: number };
   aliases: Record<string, string>;
   events: FixedEvent[];
-  overrides: NameOverride[];
 }
 
 export type PlanKind = "trip" | "daytrip" | "gathering" | "person" | "season" | "event";

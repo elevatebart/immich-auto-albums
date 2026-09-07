@@ -305,44 +305,6 @@
         ],
         "additionalProperties": false
       }
-    },
-    "overrides": {
-      "type": "array",
-      "default": [],
-      "description": "Renames generated albums by kind and key prefix.",
-      "items": {
-        "type": "object",
-        "properties": {
-          "kind": {
-            "type": "string",
-            "enum": [
-              "trip",
-              "daytrip",
-              "gathering",
-              "person",
-              "season",
-              "event"
-            ],
-            "description": "Plan kind this override applies to."
-          },
-          "keyPrefix": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Matched against the start of the plan key, for example 2020-08."
-          },
-          "name": {
-            "type": "string",
-            "minLength": 1,
-            "description": "Name to use instead of the generated one."
-          }
-        },
-        "required": [
-          "kind",
-          "keyPrefix",
-          "name"
-        ],
-        "additionalProperties": false
-      }
     }
   },
   "required": [

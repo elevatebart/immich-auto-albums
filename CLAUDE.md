@@ -44,7 +44,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - One source of truth for config bounds: the schema. Ranges, hints and defaults come from it, never hardcoded in a
   form or a second validator.
 - Only albums whose description starts with the marker are ever touched. Description line 2 is `auto: <generated name>`;
-  when album name != auto name the user renamed it and the name is preserved.
+  when album name != auto name the user renamed it and the name is preserved. Renaming in Immich is the only way to
+  override a generated name: there is no config key for it.
 - Event kinds (trip, daytrip, gathering) match existing albums by >=50% asset overlap within 45 days; person, season, event match by key.
 - In `window` scope a person year, season or fixed event is planned only when the window covers it in full, so a
   partial slice can never strip photos out of an album that a full run created. Face tags are still fetched from

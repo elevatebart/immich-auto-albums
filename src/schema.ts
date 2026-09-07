@@ -1,6 +1,5 @@
 
 export const DAY_PATTERN = "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$";
-export const PLAN_KINDS = ["trip", "daytrip", "gathering", "person", "season", "event"] as const;
 
 const int = (minimum: number, maximum: number, description: string) => ({ type: "integer", minimum, maximum, description });
 const num = (minimum: number, maximum: number, description: string) => ({ type: "number", minimum, maximum, description });
@@ -84,16 +83,6 @@ export const configSchema = {
         name: text("Album name, without the date suffix."),
         from: day("First day, inclusive."),
         to: day("Last day, inclusive."),
-      }),
-    },
-    overrides: {
-      type: "array",
-      default: [],
-      description: "Renames generated albums by kind and key prefix.",
-      items: obj({
-        kind: { type: "string", enum: [...PLAN_KINDS], description: "Plan kind this override applies to." },
-        keyPrefix: text("Matched against the start of the plan key, for example 2020-08."),
-        name: text("Name to use instead of the generated one."),
       }),
     },
   }),

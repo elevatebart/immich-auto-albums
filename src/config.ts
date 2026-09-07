@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { parse } from "smol-toml";
 import { validateConfig } from "./validate.js";
-import type { Config, PlanKind } from "./types.js";
+import type { Config } from "./types.js";
 
 type Raw = Record<string, any>;
 
@@ -48,7 +48,6 @@ export function fromToml(text: string): Config {
     seasons: { noGpsEraEnd: se.no_gps_era_end === undefined ? undefined : day(se.no_gps_era_end), minPhotos: se.min_photos ?? 5 },
     aliases: { ...(c.aliases ?? {}) },
     events: ((c.events ?? []) as Raw[]).map((e) => ({ name: e.name, from: day(e.from), to: day(e.to) })),
-    overrides: ((c.overrides ?? []) as Raw[]).map((o) => ({ kind: o.kind as PlanKind, keyPrefix: o.key_prefix, name: o.name })),
   };
   const { config, issues } = validateConfig(raw);
   if (issues.length) {
@@ -141,18 +140,6 @@ export function toToml(c: Config): string {
       row("name", q(e.name));
       row("from", e.from);
       row("to", e.to);
-      out.push("");
-    }
-    out.pop();
-  }
-
-  if (c.overrides.length) {
-    head("# Rename generated albums by kind and key prefix (key = first photo date, printed in the log).");
-    for (const o of c.overrides) {
-      out.push("[[overrides]]");
-      row("kind", q(o.kind));
-      row("key_prefix", q(o.keyPrefix));
-      row("name", q(o.name));
       out.push("");
     }
     out.pop();

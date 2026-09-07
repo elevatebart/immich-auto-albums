@@ -94,14 +94,14 @@ describe("rule engines", () => {
     expect(taggedSince(ctx)).toBe(2025);
   });
 
-  it("fixed events and overrides", () => {
+  it("fixed events, and a country name when no city is known", () => {
     const ctx = makeContext(cfg, NOW, 9000);
     const A = burst(new Date("2019-08-30T00:00:00Z"), 12, 7, (t) => mk(t, null, null, null));
     expect(planFixedEvents(ctx, A).map((p) => [p.name, p.ids.length])).toEqual([["Our wedding, Aug 2019", 11]]);
 
     const B = burst(new Date("2020-08-05T00:00:00Z"), 66, 4, (t) => mk(t, 44.0, -86.5, null, null, "United States of America"));
     const { plans } = plan(cfg, B, { now: NOW, windowDays: 9000 });
-    expect(plans.find((p) => p.kind === "trip")!.name).toBe("Around Lake Michigan 2020");
+    expect(plans.find((p) => p.kind === "trip")!.name).toBe("United States of America, Aug 2020");
   });
 });
 

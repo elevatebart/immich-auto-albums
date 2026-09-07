@@ -38,3 +38,4 @@ Two things to keep in mind when the format changes:
 - No UI, no schema validation, no `POST /search/metadata` `takenAfter` narrowing.
 - Everything else matches on purpose: the marker, the `auto:` line that detects a manual rename, the >=50%
   overlap within 45 days for trip-like kinds, key matching for the stable kinds, and the same album names.
+  Neither side has a rename key in the config: rename the album in Immich and both leave it alone.

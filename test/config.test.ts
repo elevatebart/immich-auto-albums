@@ -18,7 +18,7 @@ describe("toToml", () => {
   });
 
   it("drops optional blocks when they are empty", () => {
-    const bare = toToml({ ...cfg, aliases: {}, events: [], overrides: [] });
+    const bare = toToml({ ...cfg, aliases: {}, events: [] });
     expect(bare).not.toContain("[aliases]");
     expect(bare).not.toContain("[[events]]");
     expect(fromToml(bare).events).toEqual([]);

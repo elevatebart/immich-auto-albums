@@ -28,10 +28,9 @@ describe("configSchema", () => {
     const bare = clone() as Record<string, unknown>;
     delete bare.aliases;
     delete bare.events;
-    delete bare.overrides;
     const { config, issues } = validateConfig(bare);
     expect(issues).toEqual([]);
-    expect([config.aliases, config.events, config.overrides]).toEqual([{}, [], []]);
+    expect([config.aliases, config.events]).toEqual([{}, []]);
   });
 
   it("reports schema and ordering problems in one pass", () => {
@@ -41,7 +40,6 @@ describe("configSchema", () => {
     bad.people.maxNamed = 99;
     bad.homes[0].lat = 100;
     bad.seasons.noGpsEraEnd = "2012-02-30";
-    bad.overrides[0].kind = "roadtrip";
     bad.homes.reverse();
     bad.events[0].to = "2019-08-01";
     expect(fields(bad)).toEqual([
@@ -50,7 +48,6 @@ describe("configSchema", () => {
       "clustering.homeKm",
       "clustering.tripMinDays",
       "seasons.noGpsEraEnd",
-      "overrides[0].kind",
       "homes[1].from",
       "homes[2].from",
       "homes[3].from",

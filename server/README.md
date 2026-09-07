@@ -47,8 +47,7 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
 - `/` is the whole app: config handles on the left, the albums they produce on the right. `/config` redirects here.
   Left (`ConfigPanel.svelte`): sliders for everything numeric, `MultiSelect` of Immich people for the household, a
   tile picker with Immich thumbnails for "me" and the household, an address lookup that fills a home's coordinates,
-  native date inputs for the quiet period and the fixed events, row editors for aliases, events and overrides, and
-  the rendered TOML. Check file renders it through the dry run; Save
+  native date inputs for the fixed events, row editors for aliases and events, and the rendered TOML. Check file renders it through the dry run; Save
   writes it.
   Right (`AlbumsPanel.svelte`): the planned albums with create, update, rename, kept-name and unchanged badges, four
   thumbnails per row, the album name opening a full grid in a modal with the joining and leaving photos ringed, a

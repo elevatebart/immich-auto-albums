@@ -19,7 +19,7 @@
 		Stack,
 		Text
 	} from '@immich/ui';
-	import { PLAN_KINDS, schemaField, type ConfigIssue } from '$core/schema.js';
+	import { schemaField, type ConfigIssue } from '$core/schema.js';
 	import type { Config } from '$core/types.js';
 	import AddressLookup from '$lib/components/AddressLookup.svelte';
 	import PeoplePicker from '$lib/components/PeoplePicker.svelte';
@@ -456,45 +456,6 @@
 						onclick={() => config.events.push({ name: '', from: today(), to: today() })}
 					>
 						Add event
-					</Button>
-				</div>
-			</Stack>
-		</CardBody>
-	</Card>
-
-	<Card>
-		<CardHeader>
-			<CardTitle>Name overrides</CardTitle>
-			<CardDescription>
-				Rename generated albums by kind and key prefix. The key is printed in the preview table.
-			</CardDescription>
-		</CardHeader>
-		<CardBody>
-			<Stack gap={1}>
-				{#each config.overrides as override, i (i)}
-					<HStack gap={2}>
-						<Select bind:value={override.kind} options={[...PLAN_KINDS]} class="w-40" />
-						<Input size="small" bind:value={override.keyPrefix} placeholder="2020-08" />
-						<Input size="small" bind:value={override.name} placeholder="Around Lake Michigan" />
-						<IconButton
-							icon={mdiDelete}
-							variant="ghost"
-							color="danger"
-							size="small"
-							aria-label="remove override"
-							onclick={() => config.overrides.splice(i, 1)}
-						/>
-					</HStack>
-				{/each}
-				<div>
-					<Button
-						variant="outline"
-						size="tiny"
-						leadingIcon={mdiPlus}
-						onclick={() =>
-							config.overrides.push({ kind: 'trip' as const, keyPrefix: '', name: '' })}
-					>
-						Add override
 					</Button>
 				</div>
 			</Stack>

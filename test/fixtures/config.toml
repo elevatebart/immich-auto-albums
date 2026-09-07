@@ -87,9 +87,3 @@ to = 2019-09-01
 name = "Engagement celebration"
 from = 2018-08-23
 to = 2018-08-26
-
-# Rename generated albums by kind and key prefix (key = first photo date, printed in the log).
-[[overrides]]
-kind = "trip"
-key_prefix = "2020-08"
-name = "Around Lake Michigan 2020"

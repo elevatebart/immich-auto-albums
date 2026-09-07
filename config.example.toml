@@ -58,9 +58,3 @@ min_photos = 5
 # name = "Our wedding"
 # from = 2019-08-30
 # to = 2019-09-01
-
-# Rename generated albums by kind and key prefix (key = first photo date, shown in the preview).
-# [[overrides]]
-# kind = "trip"
-# key_prefix = "2020-08"
-# name = "Around Lake Michigan 2020"

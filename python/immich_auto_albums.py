@@ -44,7 +44,6 @@ def load_config(path):
         NO_GPS_ERA_END=se["no_gps_era_end"], SEASON_MIN_PHOTOS=se.get("min_photos", 5),
         PLACE_ALIASES=dict(c.get("aliases", {})),
         FIXED_EVENTS=[(e["name"], e["from"], e["to"]) for e in c.get("events", [])],
-        NAME_OVERRIDES={(o["kind"], o["key_prefix"]): o["name"] for o in c.get("overrides", [])},
     )
 
 load_config(os.environ.get("CONFIG", os.path.join(os.path.dirname(os.path.abspath(__file__)), "config.toml")))
@@ -376,9 +375,6 @@ def match_existing(plan, existing, used):
 def apply(plans, existing, writer):
     used = set()
     for plan in sorted(plans, key=lambda p: p["start"]):
-        for (k, prefix), name in NAME_OVERRIDES.items():
-            if k == plan["kind"] and plan["key"].startswith(prefix):
-                plan["name"] = name
         al = match_existing(plan, existing, used)
         ids = set(plan["ids"])
         if al is None:
