@@ -132,3 +132,15 @@ export interface AlbumAssets {
 	add: string[];
 	remove: string[];
 }
+
+export interface Job {
+	phase: 'assets' | 'people' | 'albums' | 'apply';
+	/** What is being worked on right now, for example the person or album being read. */
+	label: string;
+	done: number;
+	/** 0 when the total is not known yet. */
+	total: number;
+	startedAt: number;
+	endedAt?: number;
+	error?: string;
+}

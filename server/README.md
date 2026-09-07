@@ -35,6 +35,10 @@ Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (defaul
   a 403 turns into a hint in the album list rather than a wall of grey boxes.
 - `POST /api/albums/assets` with `{ id, config? }` -> `AlbumAssets`: the asset ids of one planned album, capped at
   300, plus the ones joining and leaving. Pass the draft config to open the album the list is currently showing.
+- `GET /api/progress` -> `{ job }`: what the server is busy with, one job at a time, cheap to poll. The bar in the
+  album header polls it every 700 ms while a scan, a replan or an apply is running. Phases: photos, faces, albums,
+  writing. Faces, albums and writing report a real fraction; photos only report a count, since this Immich's search
+  returns the page's own total rather than the match total.
 - `GET /api/geocode?q=` -> `{ hits: GeoHit[] }`: address to coordinates for the homes. Immich's own geodata first
   (`GET /search/places`, place level, nothing leaves the network), and only when that finds nothing, Nominatim for
   street level, which does send the query out. `GEOCODER=immich` turns that fallback off.

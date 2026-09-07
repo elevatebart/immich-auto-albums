@@ -12,6 +12,7 @@
 	import type { Config, Scope } from '$core/types.js';
 	import AlbumsPanel from '$lib/components/AlbumsPanel.svelte';
 	import ConfigPanel from '$lib/components/ConfigPanel.svelte';
+	import Progress from '$lib/components/Progress.svelte';
 	import type {
 		ApplyResponse,
 		ConfigResponse,
@@ -366,11 +367,12 @@
 				</Alert>
 			{/if}
 
+			<Progress active={scanning || applying || recomputing} />
+
 			{#if shown}
 				{#if scanning}
 					<Text color="muted" size="small">
-						Rescanning the library. These rows are the previous scan until it lands, which takes a
-						while on a big library.
+						Rescanning the library. These rows are the previous scan until it lands.
 					</Text>
 				{/if}
 				<div class:opacity-60={recomputing || scanning}>
@@ -383,9 +385,7 @@
 					/>
 				</div>
 			{:else if scanning}
-				<Text color="muted">
-					Scanning the library. A first run over a large library takes a while.
-				</Text>
+				<Text color="muted">Scanning the library. A first run over a large library takes a while.</Text>
 			{/if}
 		</div>
 	</section>

@@ -3,6 +3,7 @@ import { descriptionFor } from '$core/reconcile.js';
 import type { Action } from '$core/types.js';
 import type { ApplyResponse, ApplyResult } from '$lib/types';
 import { immichClient, invalidate, PreviewError, rowId, type Computed } from './preview';
+import { endJob, setJob, startJob } from './progress';
 
 type Write = Exclude<Action, { op: 'noop' }>;
 
@@ -32,6 +33,7 @@ export async function applyActions(c: Computed, ids?: string[]): Promise<ApplyRe
 	const todo = writable.filter((a) => !wanted || wanted.has(rowId(a)));
 	const client = c.live ? immichClient(c.cfg) : null;
 	const results: ApplyResult[] = [];
+	if (client) startJob('apply', 'albums', todo.length);
 	for (const a of todo) {
 		const row: ApplyResult = {
 			id: rowId(a),
@@ -48,7 +50,9 @@ export async function applyActions(c: Computed, ids?: string[]): Promise<ApplyRe
 			row.error = (e as Error).message;
 		}
 		results.push(row);
+		if (client) setJob({ done: results.length, label: row.name });
 	}
+	if (client) endJob(results.some((r) => !r.ok) ? `${results.filter((r) => !r.ok).length} failed` : undefined);
 	// Albums changed, so the cached preview no longer describes Immich.
 	if (client && results.some((r) => r.ok)) invalidate();
 	return {

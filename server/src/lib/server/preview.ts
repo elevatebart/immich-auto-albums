@@ -8,6 +8,7 @@ import { reconcile } from '$core/reconcile.js';
 import type { Action, Asset, Config, ManagedAlbum, Scope } from '$core/types.js';
 import type { Preview, PreviewRow } from '$lib/types';
 import { fixtureAlbums, fixtureAssets } from './fixture.js';
+import { endJob, setJob, startJob } from './progress.js';
 
 const TTL_MS = 10 * 60_000;
 
@@ -71,14 +72,25 @@ async function fromImmich(cfg: Config, now: Date, since: Date | null): Promise<S
 		const url = env.IMMICH_URL ?? cfg.immich.url;
 		throw new PreviewError(502, `Immich at ${url} is unreachable or rejected the API key: ${(e as Error).message}`);
 	}
-	const assets = await client.fetchAssets(since ?? undefined);
+	startJob('assets', since ? `photos since ${since.toISOString().slice(0, 10)}` : 'every photo');
+	// This Immich returns the page's own total, so only a figure above the count is a real total.
+	const assets = await client.fetchAssets(since ?? undefined, (done, total) =>
+		setJob({ done, total: total > done ? total : 0 })
+	);
+	startJob('people', 'named people');
 	const people = await client.fetchPeople();
 	// Face tags reach a year further back than the assets, so a trip near the edge keeps its guests.
-	await client.attachPeople(assets, people, (since ?? new Date(0)).getUTCFullYear());
+	await client.attachPeople(assets, people, (since ?? new Date(0)).getUTCFullYear(), (done, total, name) =>
+		setJob({ done, total, label: name })
+	);
+	startJob('albums', 'albums this tool manages');
+	const albums = await client.fetchManagedAlbums(cfg.immich.marker, (done, total, name) =>
+		setJob({ done, total, label: name })
+	);
 	return {
 		source: 'immich',
 		assets: [...assets.values()],
-		albums: await client.fetchManagedAlbums(cfg.immich.marker),
+		albums,
 		people: people.length,
 		now,
 		since
@@ -134,7 +146,15 @@ async function readSnapshot(since: Date | null): Promise<Snapshot> {
 		throw new PreviewError(503, 'IMMICH_API_KEY is not set. Set it, or run with DEMO=1 for the fixture library.');
 	}
 	const cfg = await readConfig();
-	return env.IMMICH_API_KEY ? await fromImmich(cfg, now, since) : fromFixture(cfg, now);
+	if (!env.IMMICH_API_KEY) return fromFixture(cfg, now);
+	try {
+		const snap = await fromImmich(cfg, now, since);
+		endJob();
+		return snap;
+	} catch (e) {
+		endJob((e as Error).message);
+		throw e;
+	}
 }
 
 /** Plan and reconcile over a snapshot already in memory. Microseconds, so a draft config is cheap. */
