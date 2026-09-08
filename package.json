@@ -6,6 +6,7 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
+    "login": "node --env-file-if-exists=.env dist/cli.js login",
     "preview": "node --env-file-if-exists=.env dist/cli.js preview",
     "apply": "node --env-file-if-exists=.env dist/cli.js apply",
     "ui": "npm --prefix server run dev",

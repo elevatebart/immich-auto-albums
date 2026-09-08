@@ -144,3 +144,57 @@ export interface Job {
 	endedAt?: number;
 	error?: string;
 }
+
+/** What the sign in card needs to render. Never carries a token or a key. */
+export interface AuthState {
+	signedIn: boolean;
+	source: 'session' | 'env' | 'none';
+	email: string | null;
+	expiresAt: string | null;
+	/** Prefill for the URL field: the session's, the environment's, else the config's. */
+	url: string;
+	passwordLogin: boolean;
+	oauth: boolean;
+	/** Where Save would write, and whether it can. */
+	envFile: string;
+	envWritable: boolean;
+	/** True when Immich could not be reached to ask about sign in methods. */
+	unreachable?: string;
+	/** DEMO=1 runs on the fixture library, so no credential is needed at all. */
+	demo: boolean;
+}
+
+export interface SignInRequest {
+	url: string;
+	email: string;
+	password: string;
+}
+
+export interface CheckResult {
+	label: string;
+	permission: string;
+	ok: boolean;
+	detail?: string;
+}
+
+export interface SignInResponse {
+	email: string;
+	expiresAt: string | null;
+	checks: CheckResult[];
+	swept: number;
+}
+
+/** The advanced path: a key minted for people who want a credential that outlives the process. */
+export interface KeyResponse {
+	secret: string;
+	name: string;
+	permissions: string[];
+	untested: string[];
+	checks: CheckResult[];
+	envFile: string;
+	envWritable: boolean;
+}
+
+export interface SaveKeyRequest {
+	secret: string;
+}

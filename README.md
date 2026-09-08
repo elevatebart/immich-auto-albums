@@ -3,23 +3,28 @@
 Pure planner + reconcile for Immich event albums, with a CLI.
 
     cp config.example.toml config.toml   # config.toml is gitignored: homes and names are personal
-    cp .env.example .env                 # so is .env: it holds the API key
     npm ci && npm run build
+    npm run login -- --save              # asks for url, email, password; mints a key into .env
     npm run preview                      # writes plan_*.json, decisions_*.csv, run_*.log to out_dir
     npm run apply
+
+`npm run login` signs in to Immich, creates an API key scoped to reading photos and people and writing albums,
+prints it, and with `--save` puts it in `.env`. Without `--save` nothing is written and the line is yours to place.
+The UI does not need any of this: it has a sign in form, and the session it opens lives in memory only.
 
 `.env` at the repo root is read by all of it: the CLI, the UI in dev and in production, and the container when the
 file sits in `/data`. Anything already in the environment wins over the file, so a one-off
 `WINDOW_DAYS=90 npm run preview` still works.
 
-Keys it understands: IMMICH_API_KEY, IMMICH_URL, CONFIG, OUT, WINDOW_DAYS, SCOPE, GEOCODER, and DEMO for the UI.
-The API key only ever lives here or in the environment, never in config.toml.
+Keys it understands: IMMICH_API_KEY, IMMICH_URL, CONFIG, OUT, WINDOW_DAYS, SCOPE, GEOCODER, ENV_FILE, and DEMO for
+the UI. A credential only ever lives in `.env` or in the environment, never in config.toml.
 
 By default a run only looks at the rolling window (`window_days`), and only fetches photos taken inside it. Person
 years, seasons and fixed events are planned only when the window covers them in full, so history is left alone. Pass
 `--all` (or `SCOPE=all`) for the whole library, which is what a first run wants.
 
-UI: `cd server && DEMO=1 npm run dev` for the preview table, the apply confirm and the config form (see `server/README.md`).
+UI: `cd server && DEMO=1 npm run dev` for the preview table, the apply confirm and the config form (see
+`server/README.md`). Without `DEMO=1` and without a key it opens on the sign in form.
 
 ## Rename an album in Immich, it sticks
 

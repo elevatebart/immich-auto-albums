@@ -15,13 +15,22 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   pull ranges and descriptions without Ajv. `config.schema.json` is generated from it by `npm run schema`.
 - `src/validate.ts`: `validateConfig(raw) -> { config, issues }` on Ajv. Fills defaults, collects every problem, and
   adds the order rules JSON Schema cannot express (homes chronological, event `to` after `from`).
-- `src/immich.ts`: fetch client for the Immich REST API (`x-api-key` header, `/api` prefix).
-- `src/cli.ts`: `preview` and `apply`. Writes `run_*.log`, `decisions_*.csv`, `plan_*.json` to `out_dir`.
+- `src/immich.ts`: fetch client for the Immich REST API (`/api` prefix). `request()` and `authHeader()` are shared
+  with `auth.ts`; a `Credential` is either an api key (`x-api-key`) or a session token (`Authorization: Bearer`).
+- `src/auth.ts`: pure. Sign in with email and password, create the labelled child session, sweep leftovers, mint a
+  scoped api key, and `verifyCredential` which probes one endpoint per permission the planner reads.
+- `src/env-file.ts`: writes `IMMICH_API_KEY` into the env file beside the config, atomically, only when asked.
+- `src/prompt.ts`, `src/login.ts`: the CLI's `login` flow, raw mode prompts, no dependency.
+- `src/cli.ts`: `login`, `preview` and `apply`. Writes `run_*.log`, `decisions_*.csv`, `plan_*.json` to `out_dir`.
+  `login` runs before the config is required and takes `--save`; `preview` and `apply` never prompt.
 - `server/`: SvelteKit UI, `@immich/ui` components on Tailwind 4 so it matches Immich. Imports `src/` through the
   `$core` alias (`server/vite.config.ts`). `server/src/lib/server/*` holds the I/O, `server/src/lib/types.ts` the wire
-  types. Routes: `GET`/`POST /api/preview` (saved config, draft config), `POST /api/apply`, `GET`/`PUT /api/config`,
+  types. Routes: `GET`/`POST`/`PUT`/`DELETE /api/auth` (state, sign in or mint a key with `?key=1`, save a key,
+  sign out), `GET`/`POST /api/preview` (saved config, draft config), `POST /api/apply`, `GET`/`PUT /api/config`,
   `GET /api/people`, `GET /api/people/<id>/thumbnail`, `GET /api/assets/<id>/thumbnail`, `POST /api/albums/assets`,
-  `GET /api/geocode`, `GET /api/progress`. One page, `/`: handles left, albums right. Apply takes a token that must match a replan of the
+  `GET /api/geocode`, `GET /api/progress`. One page, `/`: the sign in card when there is no credential and no
+  `DEMO=1`, otherwise handles left, albums right, with the account bar and the optional API key card above the
+  config form. Apply takes a token that must match a replan of the
   same config, saved or draft, so a write always matches a plan someone looked at. Apply needs the preview token plus `confirm: true`, and
   `apply.ts` is the only path that mutates Immich. Config writes need the file etag, are validated field by field in
   `config-io.ts`, keep a `.bak` and swap through a temp file. `DEMO=1` swaps in a fixture library, apply then dry runs.
@@ -36,7 +45,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `config.toml` is local and gitignored: it holds homes and household names. `config.example.toml` is the committed
   starting point, `test/fixtures/config.toml` is the tests' own copy, `config.schema.json` is the generated schema.
 - A missing config answers 404 on every route with the hint to copy the example, and the CLI exits 1 with the same.
-- Credentials live in `/.env` at the repo root, gitignored, with `.env.example` tracked. The CLI and `server start`
+- Credentials live in `/.env` at the repo root, gitignored, with `.env.example` tracked. `envFilePath(configFile)`
+  resolves it (`ENV_FILE`, else `.env` beside the config), which is `/data/.env` in the container. The CLI and `server start`
   pass it to node with `--env-file-if-exists`, the dev server through `kit.env.dir: '..'`, the container reads
   `/data/.env`. The environment always wins over the file.
 - Address lookups try Immich's geodata first. Nominatim is the fallback and sends the query out, so it stays
@@ -60,7 +70,13 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   for more history refetches rather than planning over assets it does not have. Face tags are still fetched from
   `taggedSince(ctx)`, which reaches further back than the planned years: a trip needs its faces even when the year
   it sits in is not planned.
-- The API key comes from `IMMICH_API_KEY` only. Never write it to config or logs.
+- A credential is either the signed in session, held in memory by `server/src/lib/server/credentials.ts` and nowhere
+  else, or `IMMICH_API_KEY` from the environment. Never config, never logs. The env file is written only on an
+  explicit `login --save` or Save press, never as a side effect of signing in. The browser remembers the address in
+  `localStorage` under `immich-auto-albums:url` and nothing else: no password, no token, no key.
+- The session is temporary by construction: `POST /sessions` labelled `immich-auto-albums` with a one day duration,
+  deleted on sign out and on `SIGTERM`, and a later sign in sweeps the labelled sessions a crash left behind. It
+  falls back to the login token when a server has no `/sessions`, or when logging the parent out kills the child.
 - Immich API facts verified against the OpenAPI spec: `POST /search/metadata` (page/size/withExif/visibility/personIds/takenAfter as full ISO datetime),
   `GET /people?withHidden=false&page&size`, `GET /people/{id}/thumbnail` (octet-stream),
   `POST /search/metadata` with `albumIds` for an album's asset ids: `AlbumResponseDto` carries only `assetCount`,
@@ -68,8 +84,14 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   every trip-like album miss its match and get recreated.
   `GET /search/places?name=` (`{name, latitude, longitude, admin1name, admin2name}`),
   `GET /assets/{id}/thumbnail?size=thumbnail|preview` (needs `asset.view`), `GET/POST/PATCH /albums`,
-  `PUT/DELETE /albums/{id}/assets`. Permissions needed:
-  asset.read, person.read, album.read, album.create, album.update, albumAsset.create, albumAsset.delete, user.read.
+  `PUT/DELETE /albums/{id}/assets`, `POST /auth/login` (unauthenticated, 201, `accessToken`), `POST /auth/logout`,
+  `POST /sessions` (`{deviceOS, deviceType, duration}` in seconds, returns `token`, `id`, `expiresAt`, documented as
+  a child of the current session), `GET`/`DELETE /sessions/{id}`, `POST /api-keys` (`{name, permissions}`, `secret`
+  shown once), `GET /server/features` (unauthenticated, carries `passwordLogin` and `oauth`). Every endpoint above
+  accepts `bearer` as well as `x-api-key`. There is no TOTP in Immich: the PIN and the elevated session gate locked
+  assets only. Permissions needed, and the one list of them is `ALBUM_KEY_PERMISSIONS` in `src/auth.ts`:
+  asset.read, asset.view, person.read, album.read, album.create, album.update, albumAsset.create, albumAsset.delete,
+  user.read.
 
 ## Code style
 - Comments and JSDoc at most 2 lines. No em dashes anywhere. Straight quotes.
@@ -94,5 +116,6 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 
 ## Running
     npm ci && npm run build && npm test
+    npm run login                 # url, email, password; --save writes the key into .env
     IMMICH_API_KEY=... IMMICH_URL=http://nas:2283 CONFIG=./config.toml npm run preview
     npm run preview -- --all      # the whole library, not just the window

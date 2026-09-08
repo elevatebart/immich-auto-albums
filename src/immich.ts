@@ -1,18 +1,45 @@
-import type { Asset, ManagedAlbum } from "./types.js";
+import type { Asset, Credential, ManagedAlbum } from "./types.js";
 import { parseDescription } from "./reconcile.js";
 
-export class ImmichClient {
-  constructor(private baseUrl: string, private apiKey: string) {}
+export class ImmichHttpError extends Error {
+  constructor(
+    readonly status: number,
+    method: string,
+    path: string,
+    readonly body: string,
+  ) {
+    super(`HTTP ${status} ${method} ${path}: ${body.slice(0, 300)}`);
+  }
+}
 
-  async api<T = any>(method: string, path: string, body?: unknown): Promise<T> {
-    const res = await fetch(`${this.baseUrl}/api${path}`, {
-      method,
-      headers: { "x-api-key": this.apiKey, "Content-Type": "application/json", Accept: "application/json" },
-      body: body === undefined ? undefined : JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} ${method} ${path}: ${(await res.text()).slice(0, 300)}`);
-    const text = await res.text();
-    return (text ? JSON.parse(text) : null) as T;
+/** Users type the URL, so a trailing slash or a pasted /api suffix has to survive. */
+export const normalizeUrl = (url: string) => url.trim().replace(/\/+$/, "").replace(/\/api$/, "");
+
+export const authHeader = (cred: Credential | null): Record<string, string> =>
+  !cred ? {} : cred.kind === "key" ? { "x-api-key": cred.value } : { Authorization: `Bearer ${cred.value}` };
+
+/** One request against the Immich REST API. `cred` is omitted for the unauthenticated endpoints. */
+export async function request<T = any>(
+  baseUrl: string,
+  method: string,
+  path: string,
+  opts: { cred?: Credential | null; body?: unknown } = {},
+): Promise<T> {
+  const res = await fetch(`${baseUrl}/api${path}`, {
+    method,
+    headers: { ...authHeader(opts.cred ?? null), "Content-Type": "application/json", Accept: "application/json" },
+    body: opts.body === undefined ? undefined : JSON.stringify(opts.body),
+  });
+  if (!res.ok) throw new ImmichHttpError(res.status, method, path, await res.text());
+  const text = await res.text();
+  return (text ? JSON.parse(text) : null) as T;
+}
+
+export class ImmichClient {
+  constructor(private baseUrl: string, private cred: Credential) {}
+
+  api<T = any>(method: string, path: string, body?: unknown): Promise<T> {
+    return request<T>(this.baseUrl, method, path, { cred: this.cred, body });
   }
 
   /** `onPage` reports how many assets have been yielded and how many match in total. */
