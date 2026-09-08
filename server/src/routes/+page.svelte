@@ -295,12 +295,14 @@
 				</Button>
 			</HStack>
 		{/if}
-		<HStack class="justify-between">
-			<Stack gap={0}>
+		<HStack class="justify-between gap-3">
+			<Stack gap={0} class="min-w-0">
 				<Heading size="small">Configuration</Heading>
-				<Text color="muted" size="tiny">{file || 'config.toml'}</Text>
+				<Text color="muted" size="tiny" class="block truncate" title={file || 'config.toml'}>
+					{file || 'config.toml'}
+				</Text>
 			</Stack>
-			<HStack gap={2}>
+			<HStack gap={2} class="shrink-0 [&_button]:whitespace-nowrap">
 				<Button
 					variant="outline"
 					size="tiny"
