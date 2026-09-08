@@ -50,6 +50,7 @@ export const configSchema = {
     clustering: obj({
       homeKm: num(0.1, 500, "Photos within this radius of the current home count as at home."),
       placeKm: num(0.1, 500, "Groups photos around a running centroid before naming a place."),
+      placeKmMax: { ...num(0.1, 500, "Cap for that radius as it grows with how spread out the trip is. At or below the place radius the growth is off."), default: 25 },
       mergeLabelKm: num(0.1, 500, "Merges nearby place groups before picking the album name."),
       dominantShare: num(0, 1, "Share of a trip's GPS photos one place needs to name the album."),
       regionShare: { ...num(0, 1, "Share one region needs before the other regions are ignored in the name."), default: 0.8 },

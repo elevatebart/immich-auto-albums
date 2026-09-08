@@ -60,11 +60,26 @@ interface Group {
   items: Asset[];
 }
 
-/** Greedy grouping around running centroids, largest first. */
+const SPREAD_DIVISOR = 3;
+
+/** How coarse one cluster's places are: its p75 spread over SPREAD_DIVISOR, floored at
+ * placeKm and capped at placeKmMax. A cap at or below placeKm turns the scaling off. */
+export function placeRadiusKm(cfg: Config, gps: (Asset & { lat: number; lon: number })[]): number {
+  const { placeKm, placeKmMax } = cfg.clustering;
+  if (placeKmMax <= placeKm || gps.length < 4) return placeKm;
+  const c = centroid(gps);
+  if (!c) return placeKm;
+  const spread = gps.map((a) => haversineKm(a.lat, a.lon, c.lat, c.lon)).sort((x, y) => x - y);
+  const p75 = spread[Math.floor(0.75 * (spread.length - 1))];
+  return Math.min(placeKmMax, Math.max(placeKm, p75 / SPREAD_DIVISOR));
+}
+
+/** Greedy grouping around running centroids, largest first. One radius for the whole cluster. */
 export function subPlaces(cfg: Config, gps: (Asset & { lat: number; lon: number })[]): Group[] {
+  const km = placeRadiusKm(cfg, gps);
   const groups: Group[] = [];
   for (const a of gps) {
-    const g = groups.find((g) => haversineKm(a.lat, a.lon, g.lat, g.lon) <= cfg.clustering.placeKm);
+    const g = groups.find((g) => haversineKm(a.lat, a.lon, g.lat, g.lon) <= km);
     if (g) {
       g.items.push(a);
       const n = g.items.length;

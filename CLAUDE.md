@@ -109,6 +109,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Comments and JSDoc at most 2 lines. No em dashes anywhere. Straight quotes.
 - Prefer small pure functions; no classes except the API client.
 - Names in albums are English; place names come from Immich's geocoder through `normPlace` (aliases in config).
+- The place radius adapts per cluster: `place_km` is the floor, the p75 distance from the cluster centroid
+  over 3 is the target, `place_km_max` the cap. Set the cap to `place_km` to switch it off. `merge_label_km`
+  stays fixed, so on a spread out trip the place radius, not the merge, is what joins two destinations.
 - Trip naming, in order: a place holding `dominant_share` of the GPS photos, else a `[[zones]]` area holding
   `zone_share` of them, else the area (see below), else the one country, else the top two joined by " & ".
   Zones sharing a name are one area, tested as a union and tightest first, because a mountain range is several

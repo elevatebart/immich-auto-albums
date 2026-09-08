@@ -37,6 +37,7 @@ def load_config(path):
         NO_PEOPLE_PLACES=set(pe.get("no_people_places", [])),
         HOMES=[(h["from"], h["lat"], h["lon"]) for h in c["homes"]],
         HOME_KM=cl["home_km"], PLACE_KM=cl["place_km"], MERGE_LABEL_KM=cl["merge_label_km"],
+        PLACE_KM_MAX=cl.get("place_km_max", 25),
         DOMINANT_SHARE=cl["dominant_share"], REGION_SHARE=cl.get("region_share", 0.8),
         ZONE_SHARE=cl.get("zone_share", 0.6),
         ZONES=[(z["name"], z["lat"], z["lon"], z["km"]) for z in c.get("zones", [])],
@@ -237,12 +238,28 @@ def cluster_by_gap(assets, hours):
     return clusters
 
 
+SPREAD_DIVISOR = 3
+
+
+def place_radius_km(cluster):
+    """Cluster radius: p75 spread over SPREAD_DIVISOR, floored at PLACE_KM, capped at PLACE_KM_MAX.
+    A cap at or below PLACE_KM turns the scaling off."""
+    if PLACE_KM_MAX <= PLACE_KM or len(cluster) < 4:
+        return PLACE_KM
+    lat = sum(a["lat"] for a in cluster) / len(cluster)
+    lon = sum(a["lon"] for a in cluster) / len(cluster)
+    spread = sorted(haversine_km(a["lat"], a["lon"], lat, lon) for a in cluster)
+    p75 = spread[int(0.75 * (len(spread) - 1))]
+    return min(PLACE_KM_MAX, max(PLACE_KM, p75 / SPREAD_DIVISOR))
+
+
 def sub_places(cluster):
-    """Greedy PLACE_KM grouping around running centroids; largest group first."""
+    """Greedy grouping around running centroids, largest group first. One radius for the cluster."""
+    km = place_radius_km(cluster)
     groups = []
     for a in cluster:
         for g in groups:
-            if haversine_km(a["lat"], a["lon"], g["lat"], g["lon"]) <= PLACE_KM:
+            if haversine_km(a["lat"], a["lon"], g["lat"], g["lon"]) <= km:
                 g["items"].append(a)
                 n = len(g["items"])
                 g["lat"] += (a["lat"] - g["lat"]) / n

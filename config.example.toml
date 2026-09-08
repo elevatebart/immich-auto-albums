@@ -30,6 +30,7 @@ label = "Paris"
 [clustering]
 home_km = 20              # photos within this radius of the current home are at home
 place_km = 5              # groups photos around a running centroid before naming a place
+place_km_max = 25         # that radius grows with how spread out the trip is, up to this; set to place_km to disable
 merge_label_km = 15       # merges nearby groups before picking the album name
 dominant_share = 0.75     # share of a trip's GPS photos one place needs to name the album
 region_share = 0.8        # share one region needs before the other regions are ignored in the name
