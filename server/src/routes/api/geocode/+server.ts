@@ -1,12 +1,13 @@
 import { json } from '@sveltejs/kit';
 import { env } from '$env/dynamic/private';
+import { credential } from '$lib/server/credentials';
 import { immichClient, PreviewError, readConfig } from '$lib/server/preview';
 import type { GeoHit } from '$lib/types';
 import type { RequestHandler } from './$types';
 
 /** Immich's own geodata: place level, which is all a home needs, and nothing leaves the NAS. */
 async function fromImmich(q: string): Promise<GeoHit[]> {
-	if (!env.IMMICH_API_KEY) return [];
+	if (!credential()) return [];
 	const client = immichClient(await readConfig());
 	const places = await client.api<
 		{ name: string; latitude: number; longitude: number; admin1name?: string; admin2name?: string }[]

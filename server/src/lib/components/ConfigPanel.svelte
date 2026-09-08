@@ -84,7 +84,7 @@
 		<CardHeader>
 			<CardTitle>Immich</CardTitle>
 			<CardDescription>
-				The API key is never stored here: it comes from IMMICH_API_KEY.
+				No credential is ever stored here: it comes from signing in, or from IMMICH_API_KEY.
 			</CardDescription>
 		</CardHeader>
 		<CardBody>

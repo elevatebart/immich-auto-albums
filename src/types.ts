@@ -84,3 +84,6 @@ export type Action =
   /** "update" moves photos, "rename" only writes the title and the auto line. */
   | { op: "update" | "rename"; plan: Plan; album: ManagedAlbum; add: string[]; remove: string[]; rename: boolean; userRenamed: boolean }
   | { op: "noop"; plan: Plan; album: ManagedAlbum };
+
+/** How a request authenticates: a long lived API key, or a session token from a sign in. */
+export type Credential = { kind: "key" | "bearer"; value: string };

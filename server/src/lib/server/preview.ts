@@ -2,11 +2,12 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { env } from '$env/dynamic/private';
 import { loadConfig } from '$core/config.js';
-import { ImmichClient } from '$core/immich.js';
+import { ImmichClient, ImmichHttpError } from '$core/immich.js';
 import { dayOf, makeContext, plan } from '$core/planner.js';
 import { reconcile } from '$core/reconcile.js';
 import type { Action, Asset, Config, ManagedAlbum, Scope } from '$core/types.js';
 import type { Preview, PreviewRow } from '$lib/types';
+import { credential, immichUrl } from './credentials.js';
 import { fixtureAlbums, fixtureAssets } from './fixture.js';
 import { endJob, setJob, startJob } from './progress.js';
 
@@ -60,17 +61,22 @@ interface Snapshot {
 }
 
 export function immichClient(cfg: Config): ImmichClient {
-	if (!env.IMMICH_API_KEY) throw new PreviewError(503, 'IMMICH_API_KEY is not set');
-	return new ImmichClient(env.IMMICH_URL ?? cfg.immich.url, env.IMMICH_API_KEY);
+	const cred = credential();
+	if (!cred) throw new PreviewError(503, notSignedIn);
+	return new ImmichClient(immichUrl(cfg), cred);
 }
+
+export const notSignedIn = 'Not signed in to Immich.';
 
 async function fromImmich(cfg: Config, now: Date, since: Date | null): Promise<Snapshot> {
 	const client = immichClient(cfg);
 	try {
 		await client.checkAuth();
 	} catch (e) {
-		const url = env.IMMICH_URL ?? cfg.immich.url;
-		throw new PreviewError(502, `Immich at ${url} is unreachable or rejected the API key: ${(e as Error).message}`);
+		const url = immichUrl(cfg);
+		const status = e instanceof ImmichHttpError ? e.status : 0;
+		if (status === 401) throw new PreviewError(401, 'Immich rejected the credentials. Sign in again.');
+		throw new PreviewError(502, `Immich at ${url} is unreachable: ${(e as Error).message}`);
 	}
 	startJob('assets', since ? `photos since ${since.toISOString().slice(0, 10)}` : 'every photo');
 	// This Immich returns the page's own total, so only a figure above the count is a real total.
@@ -142,11 +148,9 @@ function reachOf(cfg: Config, scope: Scope, now: Date): Date | null {
 
 async function readSnapshot(since: Date | null): Promise<Snapshot> {
 	const now = new Date();
-	if (!env.IMMICH_API_KEY && env.DEMO !== '1') {
-		throw new PreviewError(503, 'IMMICH_API_KEY is not set. Set it, or run with DEMO=1 for the fixture library.');
-	}
+	if (!credential() && env.DEMO !== '1') throw new PreviewError(503, notSignedIn);
 	const cfg = await readConfig();
-	if (!env.IMMICH_API_KEY) return fromFixture(cfg, now);
+	if (!credential()) return fromFixture(cfg, now);
 	try {
 		const snap = await fromImmich(cfg, now, since);
 		endJob();

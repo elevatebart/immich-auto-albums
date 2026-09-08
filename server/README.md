@@ -11,12 +11,21 @@ SvelteKit UI for the planner. Roadmap item 1, first slice: read-only preview.
 missing. Credentials come from `../.env` (`kit.env.dir` points there, so `$env/dynamic/private` sees it in dev and
 `npm start` passes it to node), and anything already in the environment wins.
 
-Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (default `../config.toml`),
-`WINDOW_DAYS`, `GEOCODER=immich` to keep address lookups off the internet. The key stays server side; it is never sent to the browser or written to the config.
-`server/.env` works in dev and is gitignored.
+With no credential and no `DEMO=1` the page opens on a sign in form: url, email, password. That opens an Immich
+session which lives in this process only, is labelled `immich-auto-albums` with a one day expiry, and is deleted on
+sign out or on `SIGTERM`. Nothing derived from the password reaches disk, and the browser only ever remembers the
+address (`localStorage`, `immich-auto-albums:url`).
+
+Env: `IMMICH_API_KEY` (optional now: sign in instead, and it is still what a scheduled run uses), `IMMICH_URL`,
+`CONFIG` (default `../config.toml`), `ENV_FILE` (default `.env` beside the config), `WINDOW_DAYS`,
+`GEOCODER=immich` to keep address lookups off the internet. Credentials stay server side; neither the key nor the
+session token is ever sent to the browser or written to the config. `server/.env` works in dev and is gitignored.
 
 ## What is here
 
+- `GET /api/auth` -> `AuthState`: whether there is a credential, which kind, the address to prefill, and what sign
+  in methods this Immich offers. `POST` signs in, `POST ?key=1` mints a scoped API key with that session,
+  `PUT { secret }` writes a verified key into the env file, `DELETE` signs out. No response ever carries a token.
 - `?scope=all` on the preview, and `scope` in the apply and album bodies, plan the whole library instead of the
   rolling window. The window is the default everywhere, and the checkbox in the album header is the bypass.
 - `GET /api/preview` -> `Preview` (`src/lib/types.ts`): stats plus one row per reconcile action,
@@ -82,7 +91,8 @@ imports `validateConfig` from `src/validate.ts` instead.
 
 Not here yet: the config form itself, the people picker, the Leaflet map.
 
-There is no auth in front of any of this, so bind it to the LAN.
+There is no auth in front of any of this, so bind it to the LAN. A signed in session carries the full rights of that
+Immich account, where `IMMICH_API_KEY` carries nine permissions, so sign out when you are done.
 
 ## Build
 

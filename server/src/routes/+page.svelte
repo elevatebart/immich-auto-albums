@@ -5,16 +5,21 @@
 		mdiCloudUploadOutline,
 		mdiContentSave,
 		mdiFileDocumentOutline,
+		mdiKeyVariant,
+		mdiLogoutVariant,
 		mdiRefresh
 	} from '@mdi/js';
 	import { Alert, Button, Checkbox, ConfirmModal, HStack, Heading, Stack, Text } from '@immich/ui';
 	import type { ConfigIssue } from '$core/schema.js';
 	import type { Config, Scope } from '$core/types.js';
 	import AlbumsPanel from '$lib/components/AlbumsPanel.svelte';
+	import ApiKeyCard from '$lib/components/ApiKeyCard.svelte';
 	import ConfigPanel from '$lib/components/ConfigPanel.svelte';
 	import Progress from '$lib/components/Progress.svelte';
+	import SignInPanel from '$lib/components/SignInPanel.svelte';
 	import type {
 		ApplyResponse,
+		AuthState,
 		ConfigResponse,
 		ConfigWriteResponse,
 		PeopleResponse,
@@ -22,6 +27,8 @@
 		Preview
 	} from '$lib/types';
 
+	let auth = $state<AuthState | null>(null);
+	let showKey = $state(false);
 	let config = $state<Config | null>(null);
 	let aliasRows = $state<{ from: string; to: string }[]>([]);
 	let etag = $state('');
@@ -75,8 +82,39 @@
 			issues = body.issues;
 			throw new Error(body.error);
 		}
+		// 401 means the session went away, so the sign in card comes back with the address filled.
+		if (res.status === 401) void loadAuth();
 		if (!res.ok) throw new Error(body.error ?? res.statusText);
 		return body as T;
+	}
+
+	async function loadAuth() {
+		try {
+			const res = await fetch('/api/auth');
+			auth = res.ok ? ((await res.json()) as AuthState) : null;
+		} catch {
+			auth = null;
+		}
+	}
+
+	/** Everything the page needs once there is a credential to read Immich with. */
+	async function start() {
+		await loadAuth();
+		await loadConfig();
+		void loadAlbums();
+		void loadPeople();
+	}
+
+	async function signOut() {
+		await fetch('/api/auth', { method: 'DELETE' }).catch(() => null);
+		saved = null;
+		shown = null;
+		config = null;
+		showKey = false;
+		error = null;
+		await loadAuth();
+		// A saved key in the environment survives the sign out, so the page keeps working on it.
+		if (auth?.signedIn) await start();
 	}
 
 	async function loadConfig() {
@@ -202,9 +240,12 @@
 	const select = (p: Preview) =>
 		(selected = new SvelteSet(p.rows.filter((r) => r.op !== 'noop').map((r) => r.id)));
 
-	onMount(() => {
-		loadConfig().then(() => loadAlbums());
-		loadPeople();
+	onMount(async () => {
+		await loadAuth();
+		if (auth && !auth.signedIn && !auth.demo) return;
+		await loadConfig();
+		void loadAlbums();
+		void loadPeople();
 	});
 
 	/** Switching scope needs a fresh plan from the server, in both directions. */
@@ -229,8 +270,31 @@
 
 <svelte:head><title>immich-auto-albums</title></svelte:head>
 
+{#if auth && !auth.signedIn && !auth.demo}
+	<SignInPanel {auth} onSignedIn={start} />
+{:else}
 <div class="grid gap-5 lg:h-[calc(100vh-7.5rem)] lg:grid-cols-[minmax(26rem,42%)_1fr]">
 	<section class="flex min-h-0 flex-col gap-3">
+		{#if auth?.source === 'session'}
+			<HStack class="justify-end" gap={2}>
+				<Text color="muted" size="tiny">
+					{auth.email}{auth.expiresAt
+						? `, until ${new Date(auth.expiresAt).toLocaleString()}`
+						: ''}
+				</Text>
+				<Button
+					variant="ghost"
+					size="tiny"
+					leadingIcon={mdiKeyVariant}
+					onclick={() => (showKey = !showKey)}
+				>
+					Key
+				</Button>
+				<Button variant="ghost" size="tiny" leadingIcon={mdiLogoutVariant} onclick={signOut}>
+					Sign out
+				</Button>
+			</HStack>
+		{/if}
 		<HStack class="justify-between">
 			<Stack gap={0}>
 				<Heading size="small">Configuration</Heading>
@@ -267,6 +331,9 @@
 		</HStack>
 
 		<div class="min-h-0 flex-1 overflow-y-auto pe-1 lg:pb-2">
+			{#if showKey}
+				<div class="mb-3"><ApiKeyCard /></div>
+			{/if}
 			{#if config}
 				<ConfigPanel bind:config bind:aliasRows {issues} {people} {peopleNote} {toml} />
 			{:else if busy}
@@ -390,6 +457,7 @@
 		</div>
 	</section>
 </div>
+{/if}
 
 {#if confirming && shown}
 	<ConfirmModal
