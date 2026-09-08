@@ -10,7 +10,11 @@ import type { Scope } from "./types.js";
 const mode = process.argv[2] === "apply" ? "apply" : "preview";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const configPath = process.env.CONFIG ?? path.resolve(here, "..", "config.toml");
-const cfg = await loadConfig(configPath);
+const cfg = await loadConfig(configPath).catch((e: NodeJS.ErrnoException) => {
+  const hint = e.code === "ENOENT" ? "Copy config.example.toml to config.toml, or set CONFIG." : e.message;
+  console.error(`no usable config at ${configPath}. ${hint}`);
+  process.exit(1);
+});
 
 const url = process.env.IMMICH_URL ?? cfg.immich.url;
 const apiKey = process.env.IMMICH_API_KEY ?? "";

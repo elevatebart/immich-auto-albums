@@ -6,8 +6,8 @@
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "preview": "node dist/cli.js preview",
-    "apply": "node dist/cli.js apply",
+    "preview": "node --env-file-if-exists=.env dist/cli.js preview",
+    "apply": "node --env-file-if-exists=.env dist/cli.js apply",
     "ui": "npm --prefix server run dev",
     "schema": "node scripts/write-schema.ts"
   },

@@ -35,7 +35,10 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   checking both, and dates stay bare TOML dates because the Python side compares real `date` objects.
 - `config.toml` is local and gitignored: it holds homes and household names. `config.example.toml` is the committed
   starting point, `test/fixtures/config.toml` is the tests' own copy, `config.schema.json` is the generated schema.
-- A missing config answers 404 on every route with the hint to copy the example.
+- A missing config answers 404 on every route with the hint to copy the example, and the CLI exits 1 with the same.
+- Credentials live in `/.env` at the repo root, gitignored, with `.env.example` tracked. The CLI and `server start`
+  pass it to node with `--env-file-if-exists`, the dev server through `kit.env.dir: '..'`, the container reads
+  `/data/.env`. The environment always wins over the file.
 - Address lookups try Immich's geodata first. Nominatim is the fallback and sends the query out, so it stays
   switchable off with `GEOCODER=immich`.
 

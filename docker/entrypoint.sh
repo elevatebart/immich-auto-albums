@@ -12,8 +12,11 @@ if [ ! -f "$CONFIG" ]; then
 	[ "${1:-preview}" = "serve" ] || exit 1
 fi
 
+# /data/.env is the place for the key on a NAS, so the DSM task does not carry it.
+ENVFILE="--env-file-if-exists=/data/.env"
+
 case "${1:-preview}" in
-	preview | apply) exec node dist/cli.js "$1" ;;
-	serve) exec node server/build/index.js ;;
+	preview | apply) exec node "$ENVFILE" dist/cli.js "$1" ;;
+	serve) exec node "$ENVFILE" server/build/index.js ;;
 	*) exec "$@" ;;
 esac

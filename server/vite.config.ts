@@ -17,9 +17,13 @@ export default defineConfig({
 			adapter: adapter(),
 
 			// The pure planner/reconcile/config modules live outside this app and are imported as source.
-			alias: { $core: '../src' }
+			alias: { $core: '../src' },
+
+			// .env sits next to config.toml, one directory up, so both halves of the tool read one file.
+			env: { dir: '..' }
 		})
 	],
+	envDir: '..',
 	// 5173 is usually taken here. $core resolves above the SvelteKit root, so let the dev server read it.
 	server: { port: 5678, strictPort: true, fs: { allow: ['..'] } }
 });

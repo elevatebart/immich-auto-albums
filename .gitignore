@@ -8,6 +8,11 @@ server/build/
 /config.toml.bak
 /config.toml.tmp
 
+# The key lives here. Only the example is tracked.
+/.env
+/.env.*
+!/.env.example
+
 __pycache__/
 
 run_*.log

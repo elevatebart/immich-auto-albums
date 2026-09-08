@@ -3,11 +3,13 @@
 SvelteKit UI for the planner. Roadmap item 1, first slice: read-only preview.
 
     cd server && npm install
-    IMMICH_API_KEY=... npm run dev        # http://localhost:5678
+    npm run dev                          # http://localhost:5678, credentials from ../.env
     DEMO=1 npm run dev                   # no Immich needed, fixture library
+    npm run build && npm start           # production, same ../.env
 
 `config.toml` is gitignored, so copy `config.example.toml` first. Every route answers 404 with that hint when it is
-missing.
+missing. Credentials come from `../.env` (`kit.env.dir` points there, so `$env/dynamic/private` sees it in dev and
+`npm start` passes it to node), and anything already in the environment wins.
 
 Env: `IMMICH_API_KEY` (required unless `DEMO=1`), `IMMICH_URL`, `CONFIG` (default `../config.toml`),
 `WINDOW_DAYS`, `GEOCODER=immich` to keep address lookups off the internet. The key stays server side; it is never sent to the browser or written to the config.
@@ -84,4 +86,4 @@ There is no auth in front of any of this, so bind it to the LAN.
 
 ## Build
 
-    npm run build && node build     # adapter-node, PORT and HOST respected
+    npm run build && npm start      # adapter-node, PORT and HOST respected, ../.env loaded
