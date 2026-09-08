@@ -7,6 +7,8 @@ export interface Asset {
   city: string | null;
   state: string | null;
   country: string | null;
+  /** Geocoder admin2, a French departement. Not in Immich exif; the fetch layer looks it up. */
+  district?: string | null;
   people: Set<string>;
 }
 
@@ -15,6 +17,14 @@ export interface Home {
   lat: number;
   lon: number;
   label?: string;
+}
+
+/** Hand-declared area. Names a trip that mostly happened inside it, ahead of the district. */
+export interface Zone {
+  name: string;
+  lat: number;
+  lon: number;
+  km: number;
 }
 
 export interface FixedEvent {
@@ -40,6 +50,7 @@ export interface Config {
     mergeLabelKm: number;
     dominantShare: number;
     regionShare: number;
+    zoneShare: number;
     tripGapHours: number;
     tripMinPhotos: number;
     tripMinDays: number;
@@ -47,9 +58,12 @@ export interface Config {
     gatherGapHours: number;
     gatherMinPhotos: number;
     gatherMinGuests: number;
+    eventAbsorbShare: number;
   };
   personYears: { minPhotos: number; householdMinPhotos: number };
   seasons: { noGpsEraEnd: string; minPhotos: number };
+  naming: { districtCountries: string[]; keepRegions: string[] };
+  zones: Zone[];
   aliases: Record<string, string>;
   events: FixedEvent[];
 }

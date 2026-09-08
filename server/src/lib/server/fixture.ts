@@ -5,6 +5,14 @@ import type { Asset, Config, ManagedAlbum, PlanKind } from '$core/types.js';
 const H = 3_600_000;
 const DAY = 24 * H;
 
+/** Departement per fixture town, standing in for the place lookup a live run does. */
+const DISTRICTS: Record<string, string> = {
+	Annecy: 'Haute-Savoie',
+	Chamonix: 'Haute-Savoie',
+	Lyon: 'Rhône',
+	Grenoble: 'Isère'
+};
+
 let seq = 0;
 const mk = (
 	t: Date,
@@ -18,7 +26,8 @@ const mk = (
 	lat,
 	lon,
 	city,
-	state: lat === null ? null : 'AURA',
+	state: lat === null ? null : 'Rhône-Alpes',
+	district: city === null ? null : (DISTRICTS[city] ?? null),
 	country: lat === null ? null : 'France',
 	people: new Set(people)
 });

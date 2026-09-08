@@ -12,6 +12,7 @@
 
 	const WORDS: Record<Job['phase'], string> = {
 		assets: 'Reading photos',
+		places: 'Reading places',
 		people: 'Reading faces',
 		albums: 'Reading albums',
 		apply: 'Writing albums'

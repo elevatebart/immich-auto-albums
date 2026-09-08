@@ -53,6 +53,7 @@ export const configSchema = {
       mergeLabelKm: num(0.1, 500, "Merges nearby place groups before picking the album name."),
       dominantShare: num(0, 1, "Share of a trip's GPS photos one place needs to name the album."),
       regionShare: { ...num(0, 1, "Share one region needs before the other regions are ignored in the name."), default: 0.8 },
+      zoneShare: { ...num(0, 1, "Share of a trip's GPS photos a named zone needs to name the album."), default: 0.6 },
       tripGapHours: num(1, 8760, "A gap longer than this starts a new trip."),
       tripMinPhotos: int(1, 1000, "Minimum photos for a trip."),
       tripMinDays: int(1, 365, "Minimum distinct days for a trip. Below this it is considered a day trip."),
@@ -60,6 +61,7 @@ export const configSchema = {
       gatherGapHours: num(0.1, 168, "A gap longer than this starts a new gathering."),
       gatherMinPhotos: int(1, 1000, "Minimum photos for a gathering at home."),
       gatherMinGuests: int(1, 100, "Minimum named non-household faces for a gathering."),
+      eventAbsorbShare: { ...num(0, 1, "Share of a cluster's photos and of its days inside a hand-declared event before it folds into that event."), default: 0.5 },
     }),
     personYears: obj({
       minPhotos: int(1, 5000, "Minimum photos of a person in a year for their album."),
@@ -69,10 +71,38 @@ export const configSchema = {
       noGpsEraEnd: day("Seasonal buckets only cover GPS-less photos before this date."),
       minPhotos: int(1, 1000, "Minimum photos for a seasonal album."),
     }),
+    zones: {
+      type: "array",
+      default: [],
+      description: "Named areas that beat the district when a trip mostly happened inside one.",
+      items: obj({
+        name: text("Name used in album titles."),
+        lat: num(-90, 90, "Latitude of the centre."),
+        lon: num(-180, 180, "Longitude of the centre."),
+        km: num(0.1, 500, "Radius around the centre."),
+      }),
+    },
+    naming: {
+      ...obj({
+        districtCountries: {
+          type: "array",
+          items: text("Country name as the geocoder spells it."),
+          default: ["France"],
+          description: "Countries whose albums are named after the district (admin2) rather than the region.",
+        },
+        keepRegions: {
+          type: "array",
+          items: text("Region name as the geocoder spells it."),
+          default: ["Normandy", "Île-de-France"],
+          description: "Regions that keep naming albums even in a district country.",
+        },
+      }),
+      default: { districtCountries: ["France"], keepRegions: ["Normandy", "Île-de-France"] },
+    },
     aliases: {
       type: "object",
       default: {},
-      description: "Geocoder label to the name used in albums. Applies to cities and states.",
+      description: "Geocoder label to the name used in albums. Applies to cities, districts and states.",
       propertyNames: { minLength: 1 },
       additionalProperties: text("Name used in album titles."),
     },

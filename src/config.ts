@@ -15,6 +15,7 @@ export function fromToml(text: string): Config {
   const cl = c.clustering ?? {};
   const py = c.person_years ?? {};
   const se = c.seasons ?? {};
+  const na = c.naming ?? {};
   const raw = {
     immich: {
       url: im.url ?? "http://localhost:2283",
@@ -37,6 +38,7 @@ export function fromToml(text: string): Config {
       mergeLabelKm: cl.merge_label_km,
       dominantShare: cl.dominant_share,
       regionShare: cl.region_share ?? 0.8,
+      zoneShare: cl.zone_share ?? 0.6,
       tripGapHours: cl.trip_gap_hours,
       tripMinPhotos: cl.trip_min_photos,
       tripMinDays: cl.trip_min_days,
@@ -44,9 +46,15 @@ export function fromToml(text: string): Config {
       gatherGapHours: cl.gather_gap_hours,
       gatherMinPhotos: cl.gather_min_photos,
       gatherMinGuests: cl.gather_min_guests,
+      eventAbsorbShare: cl.event_absorb_share ?? 0.5,
     },
     personYears: { minPhotos: py.min_photos, householdMinPhotos: py.household_min_photos },
     seasons: { noGpsEraEnd: se.no_gps_era_end === undefined ? undefined : day(se.no_gps_era_end), minPhotos: se.min_photos ?? 5 },
+    zones: ((c.zones ?? []) as Raw[]).map((z) => ({ name: z.name, lat: z.lat, lon: z.lon, km: z.km })),
+    naming: {
+      districtCountries: na.district_countries ?? ["France"],
+      keepRegions: na.keep_regions ?? ["Normandy", "Île-de-France"],
+    },
     aliases: { ...(c.aliases ?? {}) },
     events: ((c.events ?? []) as Raw[]).map((e) => ({ name: e.name, from: day(e.from), to: day(e.to) })),
   };
@@ -109,6 +117,7 @@ export function toToml(c: Config): string {
     ["merge_label_km", c.clustering.mergeLabelKm],
     ["dominant_share", c.clustering.dominantShare],
     ["region_share", c.clustering.regionShare],
+    ["zone_share", c.clustering.zoneShare],
     ["trip_gap_hours", c.clustering.tripGapHours],
     ["trip_min_photos", c.clustering.tripMinPhotos],
     ["trip_min_days", c.clustering.tripMinDays],
@@ -116,6 +125,7 @@ export function toToml(c: Config): string {
     ["gather_gap_hours", c.clustering.gatherGapHours],
     ["gather_min_photos", c.clustering.gatherMinPhotos],
     ["gather_min_guests", c.clustering.gatherMinGuests],
+    ["event_absorb_share", c.clustering.eventAbsorbShare],
   ] as [string, number][]) {
     row(k, v);
   }
@@ -128,9 +138,28 @@ export function toToml(c: Config): string {
   row("no_gps_era_end", c.seasons.noGpsEraEnd, "seasonal buckets only for GPS-less photos before this date");
   row("min_photos", c.seasons.minPhotos);
 
+  if (c.zones.length) {
+    head("# Named areas that beat the district when a trip mostly happened inside one.");
+    for (const z of c.zones) {
+      out.push("[[zones]]");
+      row("name", q(z.name));
+      row("lat", z.lat);
+      row("lon", z.lon);
+      row("km", z.km);
+      out.push("");
+    }
+    out.pop();
+  }
+
+  head("# Countries named after their district (a French departement) instead of their region,");
+  out.push("# and the regions that keep naming albums anyway.");
+  out.push("[naming]");
+  row("district_countries", list(c.naming.districtCountries));
+  row("keep_regions", list(c.naming.keepRegions));
+
   const aliases = Object.entries(c.aliases);
   if (aliases.length) {
-    head("# Geocoder label -> name used in albums. Applies to cities and states.");
+    head("# Geocoder label -> name used in albums. Applies to cities, districts and states.");
     out.push("[aliases]");
     for (const [from, to] of aliases) row(q(from), q(to));
   }
