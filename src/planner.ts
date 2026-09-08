@@ -1,4 +1,4 @@
-import type { Asset, Config, Plan, Scope } from "./types.js";
+import type { Asset, Config, FixedEvent, Plan, PlanKind, Scope, Zone } from "./types.js";
 
 // ---- time helpers (all UTC accessors; Asset.t encodes local time as UTC) ----
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -81,10 +81,16 @@ export function normPlace(cfg: Config, name: string | null): string | null {
   return cfg.aliases[name] ?? name;
 }
 
-/** The most frequent non-null value with its count. */
-function commonest(values: (string | null)[]): [string, number] | null {
+/** Counts non-null values. */
+function counted(values: (string | null | undefined)[]): Map<string, number> {
   const c = new Map<string, number>();
   for (const v of values) if (v) c.set(v, (c.get(v) ?? 0) + 1);
+  return c;
+}
+
+/** The most frequent non-null value with its count. */
+function commonest(values: (string | null | undefined)[]): [string, number] | null {
+  const c = counted(values);
   let best: [string, number] | null = null;
   for (const [k, v] of c) if (!best || v > best[1]) best = [k, v];
   return best;
@@ -95,7 +101,53 @@ const mostCommon = (values: (string | null)[]): string | null => commonest(value
 const label = (cfg: Config, items: Asset[], field: "city" | "state" | "country" = "city") =>
   mostCommon(items.map((a) => normPlace(cfg, a[field])));
 
-/** City if one place dominates, else state if all in one state, else country, else two countries. */
+/** Zones sharing a name are one area, so a range can be several circles that miss the valley between. */
+function zoneCircles(cfg: Config): [string, Zone[]][] {
+  const byName = new Map<string, Zone[]>();
+  for (const z of cfg.zones) byName.set(z.name, [...(byName.get(z.name) ?? []), z]);
+  const widest = (zs: Zone[]) => Math.max(...zs.map((z) => z.km));
+  return [...byName].sort((x, y) => widest(x[1]) - widest(y[1]));
+}
+
+/** The tightest zone holding `zoneShare` of the photos, so it beats the district. */
+function zoneName(cfg: Config, gps: (Asset & { lat: number; lon: number })[]): string | null {
+  const need = cfg.clustering.zoneShare * gps.length;
+  for (const [name, circles] of zoneCircles(cfg)) {
+    const inside = gps.filter((a) => circles.some((z) => haversineKm(a.lat, a.lon, z.lat, z.lon) <= z.km));
+    if (inside.length >= need) return name;
+  }
+  return null;
+}
+
+/** True when this country names albums after districts and this region is not one of the keepers. */
+function prefersDistricts(cfg: Config, gps: Asset[], region: string): boolean {
+  const keep = cfg.naming.keepRegions;
+  if (keep.includes(region) || keep.includes(normPlace(cfg, region)!)) return false;
+  const country = commonest(gps.map((a) => a.country));
+  return !!country && cfg.naming.districtCountries.includes(country[0]);
+}
+
+/** One district holding `need` photos, else the top two together, so "Isere & Drome". */
+function districtName(cfg: Config, gps: Asset[], need: number): string | null {
+  const top = [...counted(gps.map((a) => a.district ?? null))].sort((x, y) => y[1] - x[1]);
+  if (!top.length) return null;
+  if (top[0][1] >= need) return normPlace(cfg, top[0][0]);
+  if (top.length > 1 && top[0][1] + top[1][1] >= need) {
+    return top.slice(0, 2).map(([d]) => normPlace(cfg, d)).join(" & ");
+  }
+  return null;
+}
+
+/** Above city level: the district when the country prefers it, else the region. */
+function areaName(cfg: Config, gps: Asset[], share: number): string | null {
+  const need = share * gps.length;
+  const region = commonest(gps.map((a) => a.state));
+  const enough = !!region && region[1] >= need;
+  if (enough && !prefersDistricts(cfg, gps, region[0])) return normPlace(cfg, region[0]);
+  return districtName(cfg, gps, need) ?? (enough ? normPlace(cfg, region[0]) : null);
+}
+
+/** City if one place dominates, else district or region, else country, else two countries. */
 export function placeName(cfg: Config, cluster: Asset[]): string {
   const gps = cluster.filter(hasGps);
   const places: Group[] = [];
@@ -108,16 +160,12 @@ export function placeName(cfg: Config, cluster: Asset[]): string {
   if (!places.length) return "Trip";
   const top = places[0].items;
   if (top.length >= cfg.clustering.dominantShare * gps.length) {
-    return label(cfg, top) ?? label(cfg, top, "state") ?? label(cfg, top, "country") ?? "Trip";
+    return label(cfg, top) ?? areaName(cfg, top, 0) ?? label(cfg, top, "country") ?? "Trip";
   }
-  // One region holding most of the photos names the trip on its own; the rest is a detour.
-  const region = commonest(gps.map((a) => normPlace(cfg, a.state)));
-  if (region && region[1] >= cfg.clustering.regionShare * gps.length) return region[0];
-  const countries = new Map<string, number>();
-  for (const a of gps) {
-    const c = normPlace(cfg, a.country);
-    if (c) countries.set(c, (countries.get(c) ?? 0) + 1);
-  }
+  // One area holding most of the photos names the trip on its own; the rest is a detour.
+  const area = zoneName(cfg, gps) ?? areaName(cfg, gps, cfg.clustering.regionShare);
+  if (area) return area;
+  const countries = counted(gps.map((a) => normPlace(cfg, a.country)));
   if (countries.size === 1) return [...countries.keys()][0];
   const top2 = [...countries.entries()].sort((x, y) => y[1] - x[1]).slice(0, 2).map(([c]) => c);
   return top2.join(" & ") || "Trip";
@@ -315,20 +363,83 @@ export function planFixedEvents(ctx: PlanContext, assets: Asset[]): Plan[] {
   });
 }
 
+const CLUSTER_KINDS: PlanKind[] = ["trip", "daytrip", "gathering"];
+
+/** A cluster plan dropped in favour of a hand-declared event, and the event that took it. */
+export interface Fold {
+  event: string;
+  plan: Plan;
+}
+
+/**
+ * A cluster with `event_absorb_share` of both its photos and its days inside a hand-declared event is
+ * that event, so drop it and hand its photos over. The test is the range, not the event plan.
+ */
+export function foldIntoEvents(
+  ctx: PlanContext,
+  assets: Asset[],
+  plans: Plan[],
+): { plans: Plan[]; folded: Fold[] } {
+  const { cfg } = ctx;
+  if (!cfg.events.length) return { plans, folded: [] };
+  const k = cfg.clustering.eventAbsorbShare;
+  const day = new Map(assets.map((a) => [a.id, dayOf(a.t)]));
+  const events = new Map(plans.filter((p) => p.kind === "event").map((p) => [p.key, p]));
+  // Narrowest range first, then earliest, then by name: a tie goes to the most specific event.
+  const span = (e: FixedEvent) => Date.parse(e.to) - Date.parse(e.from);
+  const ordered = [...cfg.events].sort(
+    (x, y) => span(x) - span(y) || x.from.localeCompare(y.from) || x.name.localeCompare(y.name),
+  );
+  const kept: Plan[] = [];
+  const folded: Fold[] = [];
+  const extra = new Map<string, { ids: string[]; centroid?: { lat: number; lon: number } }>();
+  for (const p of plans) {
+    if (!CLUSTER_KINDS.includes(p.kind)) {
+      kept.push(p);
+      continue;
+    }
+    const days = new Set(p.ids.map((id) => day.get(id)).filter((d) => d !== undefined));
+    let best: { e: FixedEvent; share: number } | null = null;
+    for (const e of ordered) {
+      const within = (d: string) => d >= e.from && d <= e.to;
+      const share = p.ids.filter((id) => within(day.get(id) ?? "")).length / Math.max(1, p.ids.length);
+      // Photo count alone would let a three week trip fold into the wedding weekend it starts with.
+      const overDays = [...days].filter(within).length / Math.max(1, days.size);
+      if (share >= k && overDays >= k && (!best || share > best.share)) best = { e, share };
+    }
+    if (!best) {
+      kept.push(p);
+      continue;
+    }
+    const key = `${best.e.name}:${best.e.from}`;
+    const at = extra.get(key) ?? { ids: [] };
+    if (events.has(key)) extra.set(key, { ids: [...at.ids, ...p.ids], centroid: at.centroid ?? p.centroid });
+    folded.push({ event: best.e.name, plan: p });
+  }
+  // Rebuild rather than mutate: an outside caller keeps the plans it handed in.
+  const merged = kept.map((p) => {
+    const add = p.kind === "event" ? extra.get(p.key) : undefined;
+    if (!add) return p;
+    return { ...p, ids: [...new Set([...p.ids, ...add.ids])], centroid: p.centroid ?? add.centroid };
+  });
+  return { plans: merged, folded };
+}
+
 /** Full plan: every rule, sorted by start. */
 export function plan(
   cfg: Config,
   assets: Asset[],
   opts: { now?: Date; windowDays?: number; scope?: Scope } = {},
-): { plans: Plan[]; absorbed: Set<string> } {
+): { plans: Plan[]; absorbed: Set<string>; folded: Fold[] } {
   const ctx = makeContext(cfg, opts.now, opts.windowDays, opts.scope);
-  const plans = [
+  const all = [
     ...planTrips(ctx, assets),
     ...planGatherings(ctx, assets),
     ...planPersonYears(ctx, assets),
     ...planSeasons(ctx, assets),
     ...planFixedEvents(ctx, assets),
   ];
+  const { plans, folded } = foldIntoEvents(ctx, assets, all);
   plans.sort((x, y) => x.start.getTime() - y.start.getTime());
-  return { plans, absorbed: ctx.absorbed };
+  return { plans, absorbed: ctx.absorbed, folded };
 }

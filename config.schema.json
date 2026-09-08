@@ -165,6 +165,13 @@
           "description": "Share one region needs before the other regions are ignored in the name.",
           "default": 0.8
         },
+        "zoneShare": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Share of a trip's GPS photos a named zone needs to name the album.",
+          "default": 0.6
+        },
         "tripGapHours": {
           "type": "number",
           "minimum": 1,
@@ -206,6 +213,13 @@
           "minimum": 1,
           "maximum": 100,
           "description": "Minimum named non-household faces for a gathering."
+        },
+        "eventAbsorbShare": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Share of a cluster's photos and of its days inside a hand-declared event before it folds into that event.",
+          "default": 0.5
         }
       },
       "required": [
@@ -267,10 +281,91 @@
       ],
       "additionalProperties": false
     },
+    "zones": {
+      "type": "array",
+      "default": [],
+      "description": "Named areas that beat the district when a trip mostly happened inside one.",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Name used in album titles."
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Latitude of the centre."
+          },
+          "lon": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Longitude of the centre."
+          },
+          "km": {
+            "type": "number",
+            "minimum": 0.1,
+            "maximum": 500,
+            "description": "Radius around the centre."
+          }
+        },
+        "required": [
+          "name",
+          "lat",
+          "lon",
+          "km"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "naming": {
+      "type": "object",
+      "properties": {
+        "districtCountries": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Country name as the geocoder spells it."
+          },
+          "default": [
+            "France"
+          ],
+          "description": "Countries whose albums are named after the district (admin2) rather than the region."
+        },
+        "keepRegions": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Region name as the geocoder spells it."
+          },
+          "default": [
+            "Normandy",
+            "Île-de-France"
+          ],
+          "description": "Regions that keep naming albums even in a district country."
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "default": {
+        "districtCountries": [
+          "France"
+        ],
+        "keepRegions": [
+          "Normandy",
+          "Île-de-France"
+        ]
+      }
+    },
     "aliases": {
       "type": "object",
       "default": {},
-      "description": "Geocoder label to the name used in albums. Applies to cities and states.",
+      "description": "Geocoder label to the name used in albums. Applies to cities, districts and states.",
       "propertyNames": {
         "minLength": 1
       },

@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { env } from '$env/dynamic/private';
 import { loadConfig } from '$core/config.js';
-import { ImmichClient, ImmichHttpError } from '$core/immich.js';
-import { dayOf, makeContext, plan } from '$core/planner.js';
-import { reconcile } from '$core/reconcile.js';
+import { ImmichClient, ImmichHttpError, type PlaceHit } from '$core/immich.js';
+import { dayOf, haversineKm, makeContext, plan } from '$core/planner.js';
+import { orphans, reconcile } from '$core/reconcile.js';
 import type { Action, Asset, Config, ManagedAlbum, Scope } from '$core/types.js';
-import type { Preview, PreviewRow } from '$lib/types';
+import type { Preview, PreviewRow, Town } from '$lib/types';
 import { credential, immichUrl } from './credentials.js';
 import { fixtureAlbums, fixtureAssets } from './fixture.js';
 import { endJob, setJob, startJob } from './progress.js';
@@ -60,6 +60,9 @@ interface Snapshot {
 	since: Date | null;
 }
 
+/** Place lookups are stable, so they outlive the snapshot they were fetched for. */
+let placeCache = new Map<string, PlaceHit[]>();
+
 export function immichClient(cfg: Config): ImmichClient {
 	const cred = credential();
 	if (!cred) throw new PreviewError(503, notSignedIn);
@@ -82,6 +85,11 @@ async function fromImmich(cfg: Config, now: Date, since: Date | null): Promise<S
 	// This Immich returns the page's own total, so only a figure above the count is a real total.
 	const assets = await client.fetchAssets(since ?? undefined, (done, total) =>
 		setJob({ done, total: total > done ? total : 0 })
+	);
+	startJob('places', 'districts of the towns in the photos');
+	// Immich exif has the region but not the departement, so it takes a lookup per town.
+	placeCache = await client.attachDistricts(assets, cfg.naming.districtCountries, placeCache, (done, total, city) =>
+		setJob({ done, total, label: city })
 	);
 	startJob('people', 'named people');
 	const people = await client.fetchPeople();
@@ -171,8 +179,19 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 	const asked = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
 	const reach = snap.since ? (now.getTime() - snap.since.getTime()) / (24 * 3_600_000) : asked;
 	const windowDays = scope === 'all' ? asked : Math.min(asked, reach);
-	const { plans, absorbed } = plan(cfg, snap.assets, { now, windowDays, scope });
+	const { plans, absorbed, folded } = plan(cfg, snap.assets, { now, windowDays, scope });
 	const actions = reconcile(plans, snap.albums);
+	const windowStart = makeContext(cfg, now, windowDays, scope).windowStart;
+	// In window scope everything older than the window is unclaimed, and that is not news.
+	const stale = orphans(actions, snap.albums, scope === 'window' ? dayOf(windowStart) : undefined);
+	const warnings = stale.length
+		? [
+				`${stale.length} auto ${stale.length === 1 ? 'album has' : 'albums have'} no plan any more, for instance a trip now folded into one of your events. Nothing here deletes albums, so remove them in Immich if you want them gone: ${stale
+					.slice(0, 10)
+					.map((al) => `"${al.name}"`)
+					.join(', ')}${stale.length > 10 ? `, and ${stale.length - 10} more` : ''}.`
+			]
+		: [];
 	const rows = actions.map(rowOf);
 	const count = (op: PreviewRow['op']) => rows.filter((r) => r.op === op).length;
 	const gps = new Map<string, { lat: number; lon: number }>();
@@ -187,7 +206,7 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 		data: {
 			generatedAt: now.toISOString(),
 			source: snap.source,
-			windowStart: dayOf(makeContext(cfg, now, windowDays, scope).windowStart),
+			windowStart: dayOf(windowStart),
 			scope,
 			// A draft is applicable too, and its token is checked the same way: the server replans the
 			// same config and compares. What differs is that the monthly run keeps using the saved config.
@@ -198,12 +217,14 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 				withGps: snap.assets.filter((a) => a.lat !== null).length,
 				people: snap.people,
 				absorbed: absorbed.size,
+				folded: folded.length,
 				managedAlbums: snap.albums.length,
 				create: count('create'),
 				update: count('update'),
 				rename: count('rename'),
 				noop: count('noop')
 			},
+			warnings,
 			rows
 		}
 	};
@@ -236,6 +257,21 @@ async function getSnapshot(since: Date | null, refresh = false): Promise<Snapsho
 		inflight = { since, run };
 	}
 	return inflight.run;
+}
+
+/** Towns near a point with their photo counts, so the zone editor can see what a circle catches. */
+export async function townsNear(lat: number, lon: number, km: number): Promise<Town[]> {
+	const cfg = await readConfig();
+	const snap = await getSnapshot(reachOf(cfg, 'window', new Date()));
+	const towns = new Map<string, Town>();
+	for (const a of snap.assets) {
+		if (!a.city || a.lat === null || a.lon === null) continue;
+		if (haversineKm(a.lat, a.lon, lat, lon) > km) continue;
+		const t = towns.get(a.city) ?? { name: a.city, lat: a.lat, lon: a.lon, district: a.district ?? null, photos: 0 };
+		t.photos++;
+		towns.set(a.city, t);
+	}
+	return [...towns.values()].sort((x, y) => y.photos - x.photos);
 }
 
 /** The plan for the config on disk. This is the only one apply will write. */

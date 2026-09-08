@@ -4,7 +4,7 @@ Planner that clusters an Immich library into event albums (trips, day trips, gat
 person-years, seasonal buckets, fixed events) and reconciles them with existing albums. Node 22, TS strict, ESM.
 
 ## Layout
-- `src/planner.ts`: pure, no I/O. `plan(cfg, assets, opts) -> { plans, absorbed }`. Every rule is a `planX(ctx, assets)` function.
+- `src/planner.ts`: pure, no I/O. `plan(cfg, assets, opts) -> { plans, absorbed, folded }`. Every rule is a `planX(ctx, assets)` function.
   `opts.scope`: `window` plans only what the rolling window holds in full, `all` plans the whole library. The planner
   defaults to `all`; the CLI and the server default to `window` and take `--all` / `SCOPE=all` / `?scope=all`.
 - `src/reconcile.ts`: pure. `reconcile(plans, managedAlbums) -> Action[]` (create | update | rename | noop). `update`
@@ -17,6 +17,7 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   adds the order rules JSON Schema cannot express (homes chronological, event `to` after `from`).
 - `src/immich.ts`: fetch client for the Immich REST API (`/api` prefix). `request()` and `authHeader()` are shared
   with `auth.ts`; a `Credential` is either an api key (`x-api-key`) or a session token (`Authorization: Bearer`).
+  `attachDistricts` enriches assets with admin2 through the places endpoint and caches the hits per city.
 - `src/auth.ts`: pure. Sign in with email and password, create the labelled child session, sweep leftovers, mint a
   scoped api key, and `verifyCredential` which probes one endpoint per permission the planner reads.
 - `src/env-file.ts`: writes `IMMICH_API_KEY` into the env file beside the config, atomically, only when asked.
@@ -28,7 +29,7 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   types. Routes: `GET`/`POST`/`PUT`/`DELETE /api/auth` (state, sign in or mint a key with `?key=1`, save a key,
   sign out), `GET`/`POST /api/preview` (saved config, draft config), `POST /api/apply`, `GET`/`PUT /api/config`,
   `GET /api/people`, `GET /api/people/<id>/thumbnail`, `GET /api/assets/<id>/thumbnail`, `POST /api/albums/assets`,
-  `GET /api/geocode`, `GET /api/progress`. One page, `/`: the sign in card when there is no credential and no
+  `GET /api/geocode`, `GET /api/towns`, `GET /api/progress`. One page, `/`: the sign in card when there is no credential and no
   `DEMO=1`, otherwise handles left, albums right, with the account bar and the optional API key card above the
   config form. Apply takes a token that must match a replan of the
   same config, saved or draft, so a write always matches a plan someone looked at. Apply needs the preview token plus `confirm: true`, and
@@ -64,6 +65,16 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   when album name != auto name the user renamed it and the name is preserved. Renaming in Immich is the only way to
   override a generated name: there is no config key for it.
 - Event kinds (trip, daytrip, gathering) match existing albums by >=50% asset overlap within 45 days; person, season, event match by key.
+- A trip, day trip or gathering with `clustering.event_absorb_share` of both its photos and its distinct
+  days inside a hand-declared `[[events]]` range is folded into that event: the cluster plan is dropped and
+  the event album takes the union of both, centroid included. Both measures are needed, or a photo-heavy
+  wedding weekend drags the three week honeymoon it starts into the event. A tie goes to the narrowest
+  range. The test is the declared range, not the event plan, so `window` scope drops the cluster even when
+  it does not plan the event. `plan()` returns the folds as `folded`, and `foldIntoEvents` rebuilds rather
+  than mutates the plans it is handed. A threshold change can therefore move photos out of an event album.
+- Nothing here deletes an album. `orphans(actions, albums, since?)` in `reconcile.ts` lists managed albums
+  no plan claims any more, which the CLI logs and the server puts in `Preview.warnings`. Pass `since` in
+  `window` scope, or every album older than the window is reported on every run.
 - In `window` scope a person year, season or fixed event is planned only when the window covers it in full, so a
   partial slice can never strip photos out of an album that a full run created. The server enforces the same rule
   against its snapshot: a plan is clamped to how far back the fetch reached (`Snapshot.since`), and a draft asking
@@ -82,7 +93,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   `POST /search/metadata` with `albumIds` for an album's asset ids: `AlbumResponseDto` carries only `assetCount`,
   `GET /albums/{id}` does not return assets, and reading `detail.assets` silently yields an empty set, which makes
   every trip-like album miss its match and get recreated.
-  `GET /search/places?name=` (`{name, latitude, longitude, admin1name, admin2name}`),
+  `GET /search/places?name=` (`{name, latitude, longitude, admin1name, admin2name}`; `admin2name` is the only
+  source of the district, since `exifInfo.state` on this server holds admin1 alone),
   `GET /assets/{id}/thumbnail?size=thumbnail|preview` (needs `asset.view`), `GET/POST/PATCH /albums`,
   `PUT/DELETE /albums/{id}/assets`, `POST /auth/login` (unauthenticated, 201, `accessToken`), `POST /auth/logout`,
   `POST /sessions` (`{deviceOS, deviceType, duration}` in seconds, returns `token`, `id`, `expiresAt`, documented as
@@ -97,13 +109,24 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Comments and JSDoc at most 2 lines. No em dashes anywhere. Straight quotes.
 - Prefer small pure functions; no classes except the API client.
 - Names in albums are English; place names come from Immich's geocoder through `normPlace` (aliases in config).
-- Trip naming, in order: a place holding `dominant_share` of the GPS photos, else a region holding `region_share`
-  of them, else the one country, else the top two joined by " & ".
+- Trip naming, in order: a place holding `dominant_share` of the GPS photos, else a `[[zones]]` area holding
+  `zone_share` of them, else the area (see below), else the one country, else the top two joined by " & ".
+  Zones sharing a name are one area, tested as a union and tightest first, because a mountain range is several
+  small circles: one wide circle around Grenoble also holds the valley, and named a day in Bilieu a mountain trip.
+- The area is the region, except in `naming.district_countries` (France), where the district wins unless the region
+  is in `naming.keep_regions`: one district holding the share, else its top two joined by " & ", else the region.
+  Immich exif has no district, so `attachDistricts` fills `Asset.district` from `GET /search/places?name=<city>`,
+  one lookup per distinct city, picking the exact-name hit nearest the photo and dropping anything over 100 km.
+  The index skips the smallest communes, so a town it does not carry takes the district of the nearest town
+  within 25 km that resolved. Without that fill the unresolved photos dilute the share and the region wins.
+  The geodata carries pre-2016 region names ("Rhône-Alpes") and a few typos ("Loire-et-Cher"), hence the aliases.
 
 ## Roadmap
 1. Done. `server/` holds the API key, exposes preview, apply, config, people, geocode and album assets. The UI has the
-   clustering sliders, the face-tile people picker, an address lookup for the homes, event date pickers, and the album
-   list with badges, thumbnails and a modal that shows the whole album plus, for a trip, where its photos were taken.
+   clustering sliders, the face-tile people picker, an address lookup for the homes, a zone editor (one modal per
+   zone: a relief map with its circles, draggable, plus the towns each circle catches from `GET /api/towns`),
+   event date pickers, and the album list with badges, thumbnails and a modal that shows the whole album plus,
+   for a trip, where its photos were taken.
 2. Done. `src/schema.ts` holds the schema, `config.schema.json` is the generated artifact for outside consumers, and
    the form takes every slider range and hint from it.
 3. Done. `Dockerfile` has a `cli` target for the scheduled run and a default target that adds the UI, both on

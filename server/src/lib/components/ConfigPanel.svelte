@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { mdiDelete, mdiPlus } from '@mdi/js';
+	import { mdiDelete, mdiMapMarkerRadiusOutline, mdiPlus } from '@mdi/js';
 	import {
 		Alert,
 		Button,
@@ -20,10 +20,11 @@
 		Text
 	} from '@immich/ui';
 	import { schemaField, type ConfigIssue } from '$core/schema.js';
-	import type { Config } from '$core/types.js';
+	import type { Config, Zone } from '$core/types.js';
 	import AddressLookup from '$lib/components/AddressLookup.svelte';
 	import PeoplePicker from '$lib/components/PeoplePicker.svelte';
 	import Slider from '$lib/components/Slider.svelte';
+	import ZoneModal from '$lib/components/ZoneModal.svelte';
 	import type { Person } from '$lib/types';
 
 	interface Props {
@@ -62,6 +63,44 @@
 			lat: config.homes.at(-1)?.lat ?? 46.5,
 			lon: config.homes.at(-1)?.lon ?? 4
 		});
+
+	let openZone = $state<string | null>(null);
+
+	/** Entries sharing a name are one zone, so the form lists them grouped and edits them together. */
+	const zoneGroups = $derived(
+		[...new Set(config.zones.map((z) => z.name))].map((name) => ({
+			name,
+			circles: config.zones.filter((z) => z.name === name)
+		}))
+	);
+	const shown = $derived(zoneGroups.find((g) => g.name === openZone));
+
+	function addZone() {
+		const home = config.homes.at(-1);
+		const name = `Zone ${zoneGroups.length + 1}`;
+		config.zones.push({ name, lat: home?.lat ?? 46.5, lon: home?.lon ?? 4, km: 10 });
+		openZone = name;
+	}
+
+	function addCircle(name: string) {
+		const last = config.zones.filter((z) => z.name === name).at(-1);
+		config.zones.push({ name, lat: last?.lat ?? 46.5, lon: last?.lon ?? 4, km: last?.km ?? 10 });
+	}
+
+	function renameZone(from: string, to: string) {
+		for (const z of config.zones) if (z.name === from) z.name = to;
+		openZone = to;
+	}
+
+	const removeCircle = (circle: Zone) => {
+		const at = config.zones.indexOf(circle);
+		if (at >= 0) config.zones.splice(at, 1);
+	};
+
+	function removeZone(name: string) {
+		config.zones = config.zones.filter((z) => z.name !== name);
+		if (openZone === name) openZone = null;
+	}
 
 	/** A found place either starts a new home or replaces the coordinates of one. */
 	function place(hit: { name: string; lat: number; lon: number }, target: number) {
@@ -255,6 +294,62 @@
 						Add empty home
 					</Button>
 				</div>
+			</Stack>
+		</CardBody>
+	</Card>
+
+	<Card>
+		<CardHeader>
+			<CardTitle>Zones</CardTitle>
+			<CardDescription>
+				A named area beats the district in an album name. Circles sharing a name are one zone, which
+				is how a mountain range can be covered without dragging in the valley between its resorts.
+			</CardDescription>
+		</CardHeader>
+		<CardBody>
+			<Stack gap={3}>
+				{#if !config.zones.length}
+					<Text color="muted" size="small">No zones. Trips fall back to the district or the region.</Text>
+				{/if}
+				{#each zoneGroups as group (group.name)}
+					<HStack gap={2} class="border-subtle flex-wrap justify-between border-b pb-2">
+						<Stack gap={0}>
+							<Text size="small">{group.name}</Text>
+							<Text color="muted" size="tiny">
+								{group.circles.length} circle{group.circles.length === 1 ? '' : 's'}, {group.circles
+									.map((z) => `${z.km} km`)
+									.join(' + ')}
+							</Text>
+						</Stack>
+						<HStack gap={1}>
+							<Button
+								variant="outline"
+								size="tiny"
+								leadingIcon={mdiMapMarkerRadiusOutline}
+								onclick={() => (openZone = group.name)}
+							>
+								Map
+							</Button>
+							<IconButton
+								icon={mdiDelete}
+								variant="ghost"
+								color="danger"
+								size="small"
+								aria-label="remove zone"
+								onclick={() => removeZone(group.name)}
+							/>
+						</HStack>
+					</HStack>
+				{/each}
+				<div>
+					<Button variant="outline" size="tiny" leadingIcon={mdiPlus} onclick={addZone}>Add zone</Button>
+				</div>
+				<Slider
+					label="Zone share"
+					field="clustering.zoneShare"
+					bind:value={config.clustering.zoneShare}
+					{issues}
+				/>
 			</Stack>
 		</CardBody>
 	</Card>
@@ -484,3 +579,14 @@
 		{/if}
 	</Card>
 </Stack>
+
+{#if shown}
+	<ZoneModal
+		circles={shown.circles}
+		onRename={(to) => renameZone(shown.name, to)}
+		onAdd={() => addCircle(shown.name)}
+		onRemove={removeCircle}
+		onClose={() => (openZone = null)}
+	/>
+{/if}
+

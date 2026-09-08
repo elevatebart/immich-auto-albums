@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { SvelteSet } from 'svelte/reactivity';
-	import { Badge, Card, CardBody, Checkbox, HStack, Select, Stack, Text } from '@immich/ui';
+	import { Alert, Badge, Card, CardBody, Checkbox, HStack, Select, Stack, Text } from '@immich/ui';
 	import AlbumModal from '$lib/components/AlbumModal.svelte';
 	import Thumb from '$lib/components/Thumb.svelte';
 	import type { Preview, PreviewRow } from '$lib/types';
@@ -52,11 +52,17 @@
 			<Text color="muted" size="small">
 				{preview.stats.assets} assets ({preview.stats.withGps} with GPS), {preview.stats.people}
 				named people, {preview.stats.managedAlbums} managed albums, {preview.stats.absorbed}
-				GPS-less photos absorbed into trips. Window since {preview.windowStart}.
+				GPS-less photos absorbed into trips{preview.stats.folded
+					? `, ${preview.stats.folded} clusters folded into your events`
+					: ''}. Window since {preview.windowStart}.
 				{#if preview.source === 'fixture'}
 					<Badge color="secondary" size="small">fixture library</Badge>
 				{/if}
 			</Text>
+
+			{#each preview.warnings as w (w)}
+				<Alert color="warning" title="Leftover albums">{w}</Alert>
+			{/each}
 
 			<HStack gap={3} class="flex-wrap">
 				<HStack gap={2}>

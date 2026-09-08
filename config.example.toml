@@ -33,6 +33,7 @@ place_km = 5              # groups photos around a running centroid before namin
 merge_label_km = 15       # merges nearby groups before picking the album name
 dominant_share = 0.75     # share of a trip's GPS photos one place needs to name the album
 region_share = 0.8        # share one region needs before the other regions are ignored in the name
+zone_share = 0.6          # share a named zone needs to name the album, ahead of the district
 trip_gap_hours = 72       # a longer gap starts a new trip
 trip_min_photos = 10
 trip_min_days = 2         # fewer days and the cluster is considered for a day trip
@@ -40,6 +41,7 @@ daytrip_min_photos = 15
 gather_gap_hours = 2
 gather_min_photos = 30
 gather_min_guests = 3     # named faces at home who are not household
+event_absorb_share = 0.5  # this share of a cluster's photos and days inside an event folds it into that event
 
 [person_years]
 min_photos = 50
@@ -49,8 +51,30 @@ household_min_photos = 10
 no_gps_era_end = 2012-03-01   # seasonal buckets only for GPS-less photos before this date
 min_photos = 5
 
-# Geocoder label -> name used in albums. Applies to cities and states.
+# Named areas that beat the district when a trip mostly happened inside one. Entries sharing a
+# name are one area, so a range can be several tight circles that leave the valleys between out.
+[[zones]]
+name = "Mountains around Grenoble"
+lat = 45.05
+lon = 6.03
+km = 12
+
+[[zones]]
+name = "Mountains around Grenoble"
+lat = 44.95
+lon = 5.83
+km = 12
+
+# Countries named after their district (a French departement) instead of their region,
+# and the regions that keep naming albums anyway.
+[naming]
+district_countries = ["France"]
+keep_regions = ["Normandy", "Île-de-France"]
+
+# Geocoder label -> name used in albums. Applies to cities, districts and states.
 [aliases]
+"Île-de-France" = "Paris"
+"Loire-et-Cher" = "Loir-et-Cher"   # the geodata spells it wrong
 "City of Westminster" = "London"
 "Manhattan" = "New York City"
 

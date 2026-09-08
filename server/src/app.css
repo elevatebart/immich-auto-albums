@@ -20,3 +20,28 @@ body {
 	fill-opacity: 0.5;
 }
 
+/* Zone editor: the ring, its drag handle, and the towns it catches or misses. */
+.zone-ring {
+	stroke: var(--immich-ui-primary-600);
+	fill: var(--immich-ui-primary-500);
+	fill-opacity: 0.12;
+}
+
+.zone-handle {
+	border: 2px solid var(--immich-ui-primary-600);
+	border-radius: 9999px;
+	background: var(--immich-ui-light);
+	cursor: grab;
+}
+
+.town-in {
+	stroke: var(--immich-ui-success-600);
+	fill: var(--immich-ui-success-500);
+	fill-opacity: 0.7;
+}
+
+.town-out {
+	stroke: var(--immich-ui-dark-400);
+	fill: var(--immich-ui-dark-300);
+	fill-opacity: 0.35;
+}

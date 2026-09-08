@@ -4,8 +4,8 @@ import { fileURLToPath } from "node:url";
 import { loadConfig } from "./config.js";
 import { ImmichClient, ImmichHttpError } from "./immich.js";
 import { runLogin } from "./login.js";
-import { makeContext, plan, taggedSince } from "./planner.js";
-import { descriptionFor, reconcile } from "./reconcile.js";
+import { dayOf, makeContext, plan, taggedSince } from "./planner.js";
+import { descriptionFor, orphans, reconcile } from "./reconcile.js";
 import type { Scope } from "./types.js";
 
 const mode = process.argv[2] === "apply" ? "apply" : "preview";
@@ -67,6 +67,11 @@ await client.checkAuth().catch((e: Error) => {
 
 const assets = await client.fetchAssets(scope === "window" ? ctx.windowStart : undefined);
 log(`Assets: ${assets.size} (${[...assets.values()].filter((a) => a.lat !== null).length} with GPS)`);
+const districts = await client.attachDistricts(assets, cfg.naming.districtCountries);
+if (districts.size) {
+  const named = [...assets.values()].filter((a) => a.district).length;
+  log(`Districts: ${districts.size} cities looked up, ${named} photos got one`);
+}
 const people = await client.fetchPeople();
 log(`Named people: ${people.length}`);
 const counts = await client.attachPeople(assets, people, taggedSince(ctx));
@@ -74,13 +79,19 @@ for (const [name, n] of Object.entries(counts)) log(`  people: ${name} -> ${n}`)
 const missing = cfg.people.household.filter((h) => !people.some((p) => p.name === h));
 if (missing.length) log(`WARN: household names not found in Immich People: ${missing.join(", ")}`);
 
-const { plans, absorbed } = plan(cfg, [...assets.values()], { windowDays, scope });
+const { plans, absorbed, folded } = plan(cfg, [...assets.values()], { windowDays, scope });
 const byKind = plans.reduce<Record<string, number>>((m, p) => ((m[p.kind] = (m[p.kind] ?? 0) + 1), m), {});
 log(`Plans: ${JSON.stringify(byKind)}; GPS-less photos absorbed into trips: ${absorbed.size}`);
+for (const f of folded) log(`  folded ${f.plan.kind} "${f.plan.name}" (${f.plan.ids.length}) into event "${f.event}"`);
 
 const existing = await client.fetchManagedAlbums(cfg.immich.marker);
 log(`Existing auto albums: ${existing.length}`);
 const actions = reconcile(plans, existing);
+const stale = orphans(actions, existing, scope === "window" ? dayOf(ctx.windowStart) : undefined);
+if (stale.length) {
+  log(`WARN: ${stale.length} auto albums no longer have a plan, delete them in Immich if you want them gone:`);
+  for (const al of stale) log(`          ${al.name}`);
+}
 
 const csv = ["kind,action,album,assets,detail,error"];
 const q = (s: string) => `"${s.replace(/"/g, '""')}"`;
@@ -119,6 +130,10 @@ for (const a of actions) {
   log(`  ${error ? "FAILED " : a.op.padEnd(7)} ${a.plan.kind.padEnd(9)} ${a.plan.name} (${detail})`);
   if (error) log(`          ${error}`);
 }
+
+// The CSV is the audit trail, so it records what vanished as well as what was written.
+for (const f of folded) csv.push([f.plan.kind, "folded", q(f.plan.name), f.plan.ids.length, q(`into ${f.event}`), ""].join(","));
+for (const al of stale) csv.push([al.kind ?? "", "orphan", q(al.name), al.assets.size, q("left alone"), ""].join(","));
 
 const csvPath = path.join(outDir, `decisions_${stamp}.csv`);
 await writeFile(csvPath, csv.join("\n") + "\n");

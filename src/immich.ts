@@ -1,5 +1,50 @@
 import type { Asset, Credential, ManagedAlbum } from "./types.js";
 import { parseDescription } from "./reconcile.js";
+import { haversineKm } from "./planner.js";
+
+/** A hit from /search/places. `admin2name` is the district, a French departement. */
+export interface PlaceHit {
+  name: string;
+  latitude: number;
+  longitude: number;
+  admin1name?: string;
+  admin2name?: string;
+}
+
+/** Beyond this the place lookup matched a different town of the same name, so drop it. */
+const DISTRICT_MAX_KM = 100;
+
+/** Immich's place index skips the smallest communes; a known town this close shares their district. */
+const NEIGHBOUR_KM = 25;
+
+/** Prefers an exact name match, then the hit nearest the photo. */
+function districtOf(hits: PlaceHit[], city: string, lat: number, lon: number): string | null {
+  const exact = hits.filter((h) => h.name.toLowerCase() === city.toLowerCase());
+  let best: { km: number; name: string } | null = null;
+  for (const h of (exact.length ? exact : hits).filter((h) => h.admin2name)) {
+    const km = haversineKm(lat, lon, h.latitude, h.longitude);
+    if (!best || km < best.km) best = { km, name: h.admin2name! };
+  }
+  return best && best.km <= DISTRICT_MAX_KM ? best.name : null;
+}
+
+/** One asset per town, so the gap filling compares towns rather than photos. */
+const byTown = (assets: Asset[]) => [...new Map(assets.map((a) => [a.city, a])).values()];
+
+/** A town the place index does not carry takes the district of the nearest town that resolved. */
+function fillFromNeighbours(assets: Asset[]) {
+  const known = byTown(assets.filter((a) => a.district));
+  if (!known.length) return;
+  for (const town of byTown(assets.filter((a) => !a.district))) {
+    let best: { km: number; district: string } | null = null;
+    for (const k of known) {
+      const km = haversineKm(town.lat!, town.lon!, k.lat!, k.lon!);
+      if (!best || km < best.km) best = { km, district: k.district! };
+    }
+    if (!best || best.km > NEIGHBOUR_KM) continue;
+    for (const a of assets) if (a.city === town.city) a.district = best.district;
+  }
+}
 
 export class ImmichHttpError extends Error {
   constructor(
@@ -81,6 +126,35 @@ export class ImmichClient {
       });
     }
     return out;
+  }
+
+  places(name: string): Promise<PlaceHit[]> {
+    return this.api("GET", `/search/places?name=${encodeURIComponent(name)}`).then((r) => r ?? []);
+  }
+
+  /** Fills `district` for assets in `countries`, one place lookup per distinct city.
+   * Mutates the assets and returns the cache. */
+  async attachDistricts(
+    assets: Map<string, Asset>,
+    countries: string[],
+    cache = new Map<string, PlaceHit[]>(),
+    onProgress?: (done: number, total: number, city: string) => void,
+  ): Promise<Map<string, PlaceHit[]>> {
+    if (!countries.length) return cache;
+    const want = [...assets.values()].filter(
+      (a) => a.city && a.lat !== null && a.lon !== null && a.country && countries.includes(a.country),
+    );
+    const todo = [...new Set(want.map((a) => a.city!))].filter((c) => !cache.has(c));
+    let done = 0;
+    for (const city of todo) {
+      cache.set(city, await this.places(city).catch(() => []));
+      onProgress?.(++done, todo.length, city);
+    }
+    for (const a of want) {
+      a.district = districtOf(cache.get(a.city!) ?? [], a.city!, a.lat!, a.lon!);
+    }
+    fillFromNeighbours(want);
+    return cache;
   }
 
   async fetchPeople(): Promise<{ id: string; name: string }[]> {

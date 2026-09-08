@@ -35,7 +35,12 @@ Two things to keep in mind when the format changes:
 - No scope. This script always looks at the whole library: it fetches every asset and plans person years,
   seasons and fixed events over all of history. That is what `npm run preview -- --all` does on the TS side,
   where the default is the rolling window instead.
+  Following from that, it warns about every auto album no plan claims any more, where the TS side filters
+  that warning to the window it actually looked at.
 - No UI, no schema validation, no `POST /search/metadata` `takenAfter` narrowing.
+- No place cache. It looks the districts up once per town on every run, as the CLI does; only the server keeps
+  them between runs.
 - Everything else matches on purpose: the marker, the `auto:` line that detects a manual rename, the >=50%
-  overlap within 45 days for trip-like kinds, key matching for the stable kinds, and the same album names.
+  overlap within 45 days for trip-like kinds, key matching for the stable kinds, folding a cluster into a
+  hand-declared event it sits inside, and the same album names.
   Neither side has a rename key in the config: rename the album in Immich and both leave it alone.

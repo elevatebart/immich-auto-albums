@@ -9,6 +9,7 @@ import os
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from collections import Counter, defaultdict
 from datetime import date, datetime, timedelta
@@ -37,12 +38,17 @@ def load_config(path):
         HOMES=[(h["from"], h["lat"], h["lon"]) for h in c["homes"]],
         HOME_KM=cl["home_km"], PLACE_KM=cl["place_km"], MERGE_LABEL_KM=cl["merge_label_km"],
         DOMINANT_SHARE=cl["dominant_share"], REGION_SHARE=cl.get("region_share", 0.8),
+        ZONE_SHARE=cl.get("zone_share", 0.6),
+        ZONES=[(z["name"], z["lat"], z["lon"], z["km"]) for z in c.get("zones", [])],
         TRIP_GAP_H=cl["trip_gap_hours"],
         TRIP_MIN_PHOTOS=cl["trip_min_photos"], TRIP_MIN_DAYS=cl["trip_min_days"],
         DAYTRIP_MIN_PHOTOS=cl["daytrip_min_photos"], GATHER_GAP_H=cl["gather_gap_hours"],
         GATHER_MIN_PHOTOS=cl["gather_min_photos"], GATHER_MIN_GUESTS=cl["gather_min_guests"],
+        EVENT_ABSORB_SHARE=cl.get("event_absorb_share", 0.5),
         YEAR_MIN_PHOTOS=py["min_photos"], HOUSEHOLD_YEAR_MIN_PHOTOS=py["household_min_photos"],
         NO_GPS_ERA_END=se["no_gps_era_end"], SEASON_MIN_PHOTOS=se.get("min_photos", 5),
+        DISTRICT_COUNTRIES=set(c.get("naming", {}).get("district_countries", ["France"])),
+        KEEP_REGIONS=set(c.get("naming", {}).get("keep_regions", ["Normandy", "Île-de-France"])),
         PLACE_ALIASES=dict(c.get("aliases", {})),
         FIXED_EVENTS=[(e["name"], e["from"], e["to"]) for e in c.get("events", [])],
     )
@@ -113,9 +119,63 @@ def fetch_assets():
             "t": datetime.fromisoformat(local.replace("Z", "")).replace(tzinfo=None),
             "lat": ex.get("latitude"), "lon": ex.get("longitude"),
             "city": ex.get("city"), "state": ex.get("state"), "country": ex.get("country"),
+            "district": None,
             "people": set(),
         }
     return out
+
+
+DISTRICT_MAX_KM = 100  # beyond this the lookup matched another town of the same name
+NEIGHBOUR_KM = 25      # the place index skips the smallest communes; a town this close shares their district
+
+
+def district_of(hits, city, lat, lon):
+    """Prefers an exact name match, then the hit nearest the photo."""
+    exact = [h for h in hits if h.get("name", "").lower() == city.lower()]
+    best = None
+    for h in (exact or hits):
+        if not h.get("admin2name"):
+            continue
+        km = haversine_km(lat, lon, h["latitude"], h["longitude"])
+        if best is None or km < best[0]:
+            best = (km, h["admin2name"])
+    return best[1] if best and best[0] <= DISTRICT_MAX_KM else None
+
+
+def fill_from_neighbours(want):
+    """A town the place index does not carry takes the district of the nearest town that resolved."""
+    towns = {}
+    for a in want:
+        towns.setdefault(a["city"], a)
+    known = [a for a in towns.values() if a["district"]]
+    if not known:
+        return
+    for town in [a for a in towns.values() if not a["district"]]:
+        best = min(((haversine_km(town["lat"], town["lon"], k["lat"], k["lon"]), k["district"])
+                    for k in known), key=lambda p: p[0])
+        if best[0] > NEIGHBOUR_KM:
+            continue
+        for a in want:
+            if a["city"] == town["city"]:
+                a["district"] = best[1]
+
+
+def attach_districts(assets):
+    """Immich exif carries the region but not the departement, so look it up once per town."""
+    if not DISTRICT_COUNTRIES:
+        return 0
+    want = [a for a in assets.values()
+            if a["city"] and has_gps(a) and a["country"] in DISTRICT_COUNTRIES]
+    cache = {}
+    for city in {a["city"] for a in want}:
+        try:
+            cache[city] = api("GET", "/search/places?name=" + urllib.parse.quote(city), fatal=False) or []
+        except ApiError:
+            cache[city] = []
+    for a in want:
+        a["district"] = district_of(cache[a["city"]], a["city"], a["lat"], a["lon"])
+    fill_from_neighbours(want)
+    return len(cache)
 
 
 def fetch_people():
@@ -207,8 +267,58 @@ def label(items, field="city"):
     return c.most_common(1)[0][0] if c else None
 
 
+def zone_circles():
+    """Zones sharing a name are one area, so a range can be several circles that miss the valley between."""
+    by_name = defaultdict(list)
+    for name, lat, lon, km in ZONES:
+        by_name[name].append((lat, lon, km))
+    return sorted(by_name.items(), key=lambda kv: max(c[2] for c in kv[1]))
+
+
+def zone_name(gps):
+    """The tightest zone holding ZONE_SHARE of the photos, so it beats the district."""
+    need = ZONE_SHARE * len(gps)
+    for name, circles in zone_circles():
+        inside = sum(any(haversine_km(a["lat"], a["lon"], lat, lon) <= km for lat, lon, km in circles)
+                     for a in gps)
+        if inside >= need:
+            return name
+    return None
+
+
+def prefers_districts(gps, region):
+    """True when this country names albums after districts and this region is not one of the keepers."""
+    if region in KEEP_REGIONS or norm_place(region) in KEEP_REGIONS:
+        return False
+    countries = Counter(a["country"] for a in gps if a["country"])
+    return bool(countries) and countries.most_common(1)[0][0] in DISTRICT_COUNTRIES
+
+
+def district_name(gps, need):
+    """One district holding `need` photos, else the top two together, so "Isere & Drome"."""
+    top = Counter(a["district"] for a in gps if a.get("district")).most_common(2)
+    if not top:
+        return None
+    if top[0][1] >= need:
+        return norm_place(top[0][0])
+    if len(top) > 1 and top[0][1] + top[1][1] >= need:
+        return " & ".join(norm_place(d) for d, _ in top)
+    return None
+
+
+def area_name(gps, share):
+    """Above city level: the district when the country prefers it, else the region."""
+    need = share * len(gps)
+    regions = Counter(a["state"] for a in gps if a["state"])
+    region, n = regions.most_common(1)[0] if regions else (None, 0)
+    enough = region is not None and n >= need
+    if enough and not prefers_districts(gps, region):
+        return norm_place(region)
+    return district_name(gps, need) or (norm_place(region) if enough else None)
+
+
 def place_name(cluster):
-    """City if one place dominates, else state if all in one state, else country, else two countries."""
+    """City if one place dominates, else district or region, else country, else two countries."""
     gps = [a for a in cluster if has_gps(a)]
     groups = sub_places(gps)
     places = []  # {"lat","lon","items"} merged within MERGE_LABEL_KM
@@ -224,14 +334,11 @@ def place_name(cluster):
         return "Trip"
     top = places[0]["items"]
     if len(top) >= DOMINANT_SHARE * len(gps):
-        return label(top) or label(top, "state") or label(top, "country") or "Trip"
-    # One region holding most of the photos names the trip on its own; the rest is a detour.
-    regions = Counter(norm_place(a["state"]) for a in gps)
-    regions.pop(None, None)
-    if regions:
-        region, n = regions.most_common(1)[0]
-        if n >= REGION_SHARE * len(gps):
-            return region
+        return label(top) or area_name(top, 0) or label(top, "country") or "Trip"
+    # One area holding most of the photos names the trip on its own; the rest is a detour.
+    area = zone_name(gps) or area_name(gps, REGION_SHARE)
+    if area:
+        return area
     countries = Counter(norm_place(a["country"]) for a in gps)
     countries.pop(None, None)
     if len(countries) == 1:
@@ -338,6 +445,51 @@ def plan_fixed_events(assets):
     return plans
 
 
+CLUSTER_KINDS = ("trip", "daytrip", "gathering")
+
+
+def fold_into_events(assets, plans):
+    """A cluster with EVENT_ABSORB_SHARE of its photos and its days inside a hand-declared event is that event."""
+    if not FIXED_EVENTS:
+        return plans, []
+    day = {a["id"]: a["t"].date() for a in assets}
+    events = {p["key"]: p for p in plans if p["kind"] == "event"}
+    # Narrowest range first, then earliest, then by name: a tie goes to the most specific event.
+    ordered = sorted(FIXED_EVENTS, key=lambda e: (e[2] - e[1], e[1], e[0]))
+    kept, folded, extra = [], [], defaultdict(list)
+    for p in plans:
+        if p["kind"] not in CLUSTER_KINDS:
+            kept.append(p)
+            continue
+        days = {day[i] for i in p["ids"] if i in day}
+        best = None
+        for name, d0, d1 in ordered:
+            share = sum(1 for i in p["ids"] if i in day and d0 <= day[i] <= d1) / max(1, len(p["ids"]))
+            # Photo count alone would let a three week trip fold into the wedding weekend it starts with.
+            over_days = sum(1 for d in days if d0 <= d <= d1) / max(1, len(days))
+            if share >= EVENT_ABSORB_SHARE and over_days >= EVENT_ABSORB_SHARE and (best is None or share > best[1]):
+                best = ((name, d0), share)
+        if best is None:
+            kept.append(p)
+            continue
+        (name, d0), _ = best
+        key = f"{name}:{d0.isoformat()}"
+        if key in events:
+            extra[key].extend(p["ids"])
+        folded.append((name, p))
+    # Rebuild rather than mutate, so a caller keeps the plans it handed in.
+    merged = []
+    for p in kept:
+        add = extra.get(p["key"]) if p["kind"] == "event" else None
+        if not add:
+            merged.append(p)
+            continue
+        seen = set(p["ids"])
+        tail = [i for i in dict.fromkeys(add) if i not in seen]
+        merged.append({**p, "ids": p["ids"] + tail})
+    return merged, folded
+
+
 # ---- Reconcile with existing albums ----
 def desc_for(plan):
     """Second line records the generated name so a manual rename in Immich is detected and preserved."""
@@ -434,7 +586,7 @@ def apply(plans, existing, writer):
         log(f"  {'FAILED ' if error else op:7} {plan['kind']:9} {plan['name']} ({detail})")
         if error:
             log(f"          {error}")
-    return failures
+    return failures, used
 
 
 def main():
@@ -446,6 +598,10 @@ def main():
 
     assets = fetch_assets()
     log(f"Assets: {len(assets)} ({sum(has_gps(a) for a in assets.values())} with GPS)")
+    towns = attach_districts(assets)
+    if towns:
+        named = sum(1 for a in assets.values() if a.get("district"))
+        log(f"Districts: {towns} cities looked up, {named} photos got one")
     people = fetch_people()
     log(f"Named people: {len(people)}")
     attach_people(assets, people)
@@ -457,7 +613,10 @@ def main():
     absorbed = set()
     plans = (plan_trips_and_daytrips(alist, absorbed) + plan_gatherings(alist) + plan_person_years(alist)
              + plan_seasons(alist, absorbed) + plan_fixed_events(alist))
+    plans, folded = fold_into_events(alist, plans)
     log(f"GPS-less photos absorbed into trips: {len(absorbed)}")
+    for name, p in folded:
+        log(f"  folded {p['kind']} \"{p['name']}\" ({len(p['ids'])}) into event \"{name}\"")
     log(f"Plans: {dict(Counter(p['kind'] for p in plans))}")
 
     existing = load_auto_albums()
@@ -467,7 +626,12 @@ def main():
     with open(csv_path, "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f)
         w.writerow(["kind", "action", "album", "assets", "detail", "error"])
-        failures = apply(plans, existing, w)
+        failures, claimed = apply(plans, existing, w)
+    stale = [al for al in existing if al["id"] not in claimed]
+    if stale:
+        log(f"WARN: {len(stale)} auto albums no longer have a plan, delete them in Immich if you want them gone:")
+        for al in stale:
+            log(f"          {al['name']}")
     log(f"Decision log: {csv_path}")
     if DRY_RUN:
         log("DRY RUN, nothing written to Immich. Review the CSV, then set DRY_RUN=0.")

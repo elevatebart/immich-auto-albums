@@ -1,8 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fromToml } from "../src/config.js";
-import { plan, planFixedEvents, planTrips, makeContext, taggedSince, yearsCovered } from "../src/planner.js";
-import { descriptionFor, parseDescription, reconcile } from "../src/reconcile.js";
+import { foldIntoEvents, plan, planFixedEvents, planTrips, makeContext, taggedSince, yearsCovered } from "../src/planner.js";
+import { descriptionFor, orphans, parseDescription, reconcile } from "../src/reconcile.js";
 import type { Asset, ManagedAlbum } from "../src/types.js";
 
 const cfg = fromToml(readFileSync(new URL("./fixtures/config.toml", import.meta.url), "utf8"));
@@ -10,8 +10,8 @@ const NOW = new Date("2026-09-04T12:00:00Z");
 const H = 3_600_000;
 
 let seq = 0;
-const mk = (t: Date, lat: number | null, lon: number | null, city: string | null, state: string | null = null, country: string | null = "France", people: string[] = []): Asset => ({
-  id: `a${seq++}`, t, lat, lon, city, state, country, people: new Set(people),
+const mk = (t: Date, lat: number | null, lon: number | null, city: string | null, state: string | null = null, country: string | null = "France", people: string[] = [], district: string | null = null): Asset => ({
+  id: `a${seq++}`, t, lat, lon, city, state, district, country, people: new Set(people),
 });
 const burst = (start: Date, n: number, stepH: number, f: (t: Date, i: number) => Asset) =>
   Array.from({ length: n }, (_, i) => f(new Date(start.getTime() + i * stepH * H), i));
@@ -65,6 +65,37 @@ describe("rule engines", () => {
       "Illinois, Mar 2025",
       "USA, Apr 2025",
       "France & UK, May 2025",
+    ]);
+  });
+
+  it("a French departement names the trip, unless the region is one to keep", () => {
+    const ctx = makeContext(cfg, NOW, 9000);
+    const trip = (off: number, spots: [number, number, string, string, string | null, number][]) => {
+      const b = new Date(Date.UTC(2025, 0, 1 + off));
+      let n = 0;
+      return spots.flatMap(([lat, lon, city, state, district, count]) =>
+        Array.from({ length: count }, () => mk(new Date(b.getTime() + n++ * 6 * H), lat, lon, city, state, "France", [], district)));
+    };
+    const A = [
+      // Two departements of one region: the region is dropped, both departements are named.
+      ...trip(0, [[45.52, 4.87, "Vienne", "Rhône-Alpes", "Isère", 10], [44.93, 4.89, "Valence", "Rhône-Alpes", "Drôme", 8]]),
+      // Three of them: no pair carries the trip, so the region comes back.
+      ...trip(30, [[45.52, 4.87, "Vienne", "Rhône-Alpes", "Isère", 8], [44.93, 4.89, "Valence", "Rhône-Alpes", "Drôme", 6], [45.57, 5.92, "Chambéry", "Rhône-Alpes", "Savoie", 6]]),
+      // Kept regions name the trip themselves, and an alias renames one of them.
+      ...trip(60, [[49.05, -1.45, "Coutances", "Normandy", "Manche", 10], [49.28, -0.7, "Bayeux", "Normandy", "Calvados", 8]]),
+      ...trip(90, [[48.85, 2.35, "Paris 09 Opéra", "Île-de-France", "Paris", 10], [48.4, 2.7, "Fontainebleau", "Île-de-France", "Seine-et-Marne", 8]]),
+      // Villages of two departements: two circles of one zone hold them, and it names the trip.
+      ...trip(150, [[45.05, 6.03, "Le Bourg-d'Oisans", "Rhône-Alpes", "Isère", 8], [44.9, 5.79, "La Mure", "Rhône-Alpes", "Isère", 6], [45.42, 5.87, "Saint-Pierre-d'Entremont", "Rhône-Alpes", "Savoie", 5]]),
+      // No district known, as for a country Immich has no admin2 for: the region still names it.
+      ...trip(120, [[41.88, -87.63, "Chicago", "Illinois", null, 8], [42.05, -88.08, "Schaumburg", "Illinois", null, 6], [41.5, -90.5, "Moline", "Illinois", null, 5]]),
+    ];
+    expect(planTrips(ctx, A).map((p) => p.name)).toEqual([
+      "Isère & Drôme, Jan 2025",
+      "Rhône-Alpes, Jan-Feb 2025",
+      "Normandy, Mar 2025",
+      "Paris, Apr 2025",
+      "Illinois, May 2025",
+      "Mountains around Grenoble, May-Jun 2025",
     ]);
   });
 
@@ -129,6 +160,70 @@ describe("rule engines", () => {
     expect(planTrips(makeContext(loose, NOW, 9000), A).map((p) => p.name)).toEqual([
       "France & Switzerland, Jun 2025",
     ]);
+  });
+
+  it("a cluster inside a hand-declared event folds into it instead of getting its own album", () => {
+    // The wedding weekend, shot in Saint-Jean-en-Royans, plus a few phone photos with no GPS.
+    const A = [
+      ...burst(new Date("2019-08-30T09:00:00Z"), 24, 2, (t) => mk(t, 45.01, 5.29, "Saint-Jean-en-Royans", "Auvergne-Rhône-Alpes")),
+      ...burst(new Date("2019-08-31T12:00:00Z"), 6, 1, (t) => mk(t, null, null, null)),
+    ];
+    const { plans, folded } = plan(cfg, A, { now: NOW, windowDays: 9000, scope: "all" });
+    expect(plans.map((p) => `${p.kind}|${p.name}|${p.ids.length}`)).toEqual(["event|Our wedding, Aug 2019|30"]);
+    expect(folded.map((f) => [f.event, f.plan.kind])).toEqual([["Our wedding", "trip"]]);
+    // The trip's centroid rides along so the event row still draws a map.
+    expect(plans[0].centroid).toBeDefined();
+  });
+
+  it("the event takes the whole cluster, including the days either side of its range", () => {
+    const A = burst(new Date("2019-08-29T09:00:00Z"), 30, 3, (t) => mk(t, 45.01, 5.29, "Saint-Jean-en-Royans"));
+    const ctx = makeContext(cfg, NOW, 9000);
+    // On its own the range holds fewer: the arrival and the drive home fall outside it.
+    expect(planFixedEvents(ctx, A)[0].ids).toHaveLength(24);
+    const { plans } = plan(cfg, A, { now: NOW, windowDays: 9000, scope: "all" });
+    expect(plans.map((p) => `${p.kind}|${p.ids.length}`)).toEqual(["event|30"]);
+  });
+
+  it("a trip only clipping the range keeps its own album", () => {
+    const A = burst(new Date("2019-09-01T09:00:00Z"), 40, 6, (t) => mk(t, 45.9, 6.13, "Annecy", "AURA"));
+    const kinds = plan(cfg, A, { now: NOW, windowDays: 9000, scope: "all" }).plans.map((p) => p.kind);
+    expect(kinds).toEqual(["event", "trip"]);
+  });
+
+  it("window scope drops the cluster too, so a full run's event album is left alone", () => {
+    const A = burst(new Date("2019-08-30T09:00:00Z"), 40, 2, (t) => mk(t, 45.01, 5.29, "Saint-Jean-en-Royans"));
+    // A window starting mid-event: trips see the tail of it, the event itself is not covered.
+    const { plans, folded } = plan(cfg, A, { now: NOW, windowDays: 2561, scope: "window" });
+    expect(plans).toEqual([]);
+    expect(folded.map((f) => f.event)).toEqual(["Our wedding"]);
+  });
+
+  it("a photo-heavy weekend does not drag three weeks of honeymoon into the event", () => {
+    const A = [
+      // 40 photos over the wedding weekend, then a fortnight of one a day, all one cluster.
+      ...burst(new Date("2019-08-30T09:00:00Z"), 40, 1.5, (t) => mk(t, 45.01, 5.29, "Saint-Jean-en-Royans")),
+      ...burst(new Date("2019-09-02T12:00:00Z"), 15, 24, (t) => mk(t, 43.7, 7.26, "Nice")),
+    ];
+    // Three quarters of the photos are inside the range, but only three of eighteen days are.
+    const kinds = plan(cfg, A, { now: NOW, windowDays: 9000, scope: "all" }).plans.map((p) => p.kind);
+    expect(kinds).toEqual(["event", "trip"]);
+  });
+
+  it("two events over one cluster: the larger share wins", () => {
+    const A = burst(new Date("2018-08-24T09:00:00Z"), 20, 3, (t) => mk(t, 45.01, 5.29, "Saint-Jean-en-Royans"));
+    const two = {
+      ...cfg,
+      events: [
+        { name: "Engagement celebration", from: "2018-08-23", to: "2018-08-26" },
+        { name: "A day of it", from: "2018-08-24", to: "2018-08-24" },
+      ],
+    };
+    const trips = planTrips(makeContext(two, NOW, 9000), A);
+    const { folded } = foldIntoEvents(makeContext(two, NOW, 9000), A, trips);
+    expect(folded.map((f) => f.event)).toEqual(["Engagement celebration"]);
+    // With no event declared the trip survives untouched.
+    const none = makeContext({ ...cfg, events: [] }, NOW, 9000);
+    expect(foldIntoEvents(none, A, planTrips(none, A)).folded).toEqual([]);
   });
 
   it("fixed events, and a country name when no city is known", () => {
@@ -196,5 +291,15 @@ describe("reconcile", () => {
     // Same photos, same name: nothing to do.
     const same: ManagedAlbum = { ...named, id: "w", name: trip.name, auto: trip.name };
     expect(reconcile([trip], [same])[0].op).toBe("noop");
+  });
+
+  it("reports managed albums no plan claims any more", () => {
+    const p = { kind: "trip" as const, key: "2019-08-30", name: "Saint-Jean-en-Royans, Aug 2019", ids: ["a", "b"], start: new Date("2019-08-30") };
+    const mine: ManagedAlbum = { id: "x", name: p.name, auto: p.name, kind: "trip", key: p.key, assets: new Set(["a", "b"]) };
+    const gone: ManagedAlbum = { ...mine, id: "y", key: "2015-01-01", assets: new Set(["z"]) };
+    const actions = reconcile([p], [mine, gone]);
+    expect(orphans(actions, [mine, gone]).map((al) => al.id)).toEqual(["y"]);
+    // A window run never looked at 2015, so it is not news that nothing claimed it.
+    expect(orphans(actions, [mine, gone], "2019-01-01")).toEqual([]);
   });
 });

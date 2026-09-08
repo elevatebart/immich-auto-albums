@@ -63,3 +63,20 @@ export function reconcile(plans: Plan[], existing: ManagedAlbum[]): Action[] {
   }
   return actions;
 }
+
+/** The day an album key records: a trip key is a day, a person, season or event key ends in one. */
+export function keyDay(al: ManagedAlbum): string | null {
+  const tail = al.key?.slice(al.key.lastIndexOf(":") + 1) ?? "";
+  if (/^\d{4}-\d{2}-\d{2}$/.test(tail)) return tail;
+  if (/^\d{4}$/.test(tail)) return `${tail}-01-01`;
+  return null;
+}
+
+/**
+ * Managed albums no plan claims any more, for instance a trip now folded into a hand-declared event.
+ * `since` drops the ones a window run never looked at, which would otherwise be the whole history.
+ */
+export function orphans(actions: Action[], existing: ManagedAlbum[], since?: string): ManagedAlbum[] {
+  const claimed = new Set(actions.flatMap((a) => (a.op === "create" ? [] : [a.album.id])));
+  return existing.filter((al) => !claimed.has(al.id) && (!since || (keyDay(al) ?? since) >= since));
+}

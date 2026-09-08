@@ -29,6 +29,8 @@ export interface PreviewStats {
 	withGps: number;
 	people: number;
 	absorbed: number;
+	/** Cluster albums given up to a hand-declared event instead. */
+	folded: number;
 	managedAlbums: number;
 	create: number;
 	update: number;
@@ -48,6 +50,8 @@ export interface Preview {
 	/** "window" plans only what the rolling window covers in full, "all" the whole library. */
 	scope: Scope;
 	stats: PreviewStats;
+	/** Legal but worth reading, such as an auto album no plan claims any more. */
+	warnings: string[];
 	rows: PreviewRow[];
 }
 
@@ -121,6 +125,15 @@ export interface GeoHit {
 	source: 'immich' | 'nominatim';
 }
 
+/** A town in the snapshot, for the zone editor: is this circle holding a summit or a valley? */
+export interface Town {
+	name: string;
+	lat: number;
+	lon: number;
+	district: string | null;
+	photos: number;
+}
+
 export interface AlbumAssets {
 	id: string;
 	name: string;
@@ -134,7 +147,7 @@ export interface AlbumAssets {
 }
 
 export interface Job {
-	phase: 'assets' | 'people' | 'albums' | 'apply';
+	phase: 'assets' | 'places' | 'people' | 'albums' | 'apply';
 	/** What is being worked on right now, for example the person or album being read. */
 	label: string;
 	done: number;
