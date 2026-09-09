@@ -67,6 +67,17 @@ Two targets. `cli` is the monthly run, the default adds the UI.
 Building on a Mac for a Synology needs `--platform linux/amd64`. Both targets cross-build, or build on the
 NAS itself over SSH.
 
+    docker build --platform linux/amd64 --target cli -t immich-auto-albums:cli .
+
+There is no published image, so a Mac build has to be carried over. Either pipe it:
+
+    docker save immich-auto-albums:cli | gzip | ssh bart@nas 'sudo /usr/local/bin/docker load'
+
+or, when `sudo` over SSH wants a password, drop the tarball on the share and load it from a one-shot DSM task:
+
+    docker save immich-auto-albums:cli | gzip > /Volumes/tools/immich-auto-albums/cli.tar.gz
+    /usr/local/bin/docker load -i /volume1/tools/immich-auto-albums/cli.tar.gz
+
 `/data` is the only mount: it holds `config.toml` and receives `run_*.log`, `decisions_*.csv` and `plan_*.json`.
 The container runs as root so it can write to a NAS share.
 
