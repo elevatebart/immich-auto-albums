@@ -80,6 +80,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Nothing here deletes an album. `orphans(actions, albums, since?)` in `reconcile.ts` lists managed albums
   no plan claims any more, which the CLI logs and the server puts in `Preview.warnings`. Pass `since` in
   `window` scope, or every album older than the window is reported on every run.
+- `person_years.favorites` is the allowlist for person albums. Empty means everyone over the threshold, which
+  is the behaviour from before the key; `household` still only lowers the photo count, it does not grant an album.
 - In `window` scope a person year, season or fixed event is planned only when the window covers it in full, so a
   partial slice can never strip photos out of an album that a full run created. The server enforces the same rule
   against its snapshot: a plan is clamped to how far back the fetch reached (`Snapshot.since`), and a draft asking
@@ -131,8 +133,9 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 
 ## Roadmap
 1. Done. `server/` holds the API key, exposes preview, apply, config, people, geocode and album assets. The UI has the
-   clustering sliders, the face-tile people picker, an address lookup for the homes, a zone editor (one modal per
-   zone: a relief map with its circles, draggable, plus the towns each circle catches from `GET /api/towns`),
+   clustering sliders, the face-tile people pickers (me, household, person-year favorites), an address lookup
+   for the homes, a zone editor (one modal per zone: a relief map with its circles, draggable, plus the towns
+   each circle catches from `GET /api/towns`),
    event date pickers, and the album list with badges, thumbnails and a modal that shows the whole album plus,
    for a trip, where its photos were taken. The form covers every config key, and highlights what the config on
    screen changes about the saved file or about `config.example.toml`.

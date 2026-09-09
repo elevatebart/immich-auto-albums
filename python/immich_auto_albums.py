@@ -46,6 +46,7 @@ def load_config(path):
         DAYTRIP_MIN_PHOTOS=cl["daytrip_min_photos"], GATHER_GAP_H=cl["gather_gap_hours"],
         GATHER_MIN_PHOTOS=cl["gather_min_photos"], GATHER_MIN_GUESTS=cl["gather_min_guests"],
         EVENT_ABSORB_SHARE=cl.get("event_absorb_share", 0.5),
+        YEAR_PEOPLE=set(py.get("favorites", [])),
         YEAR_MIN_PHOTOS=py["min_photos"], HOUSEHOLD_YEAR_MIN_PHOTOS=py["household_min_photos"],
         NO_GPS_ERA_END=se["no_gps_era_end"], SEASON_MIN_PHOTOS=se.get("min_photos", 5),
         DISTRICT_COUNTRIES=set(c.get("naming", {}).get("district_countries", ["France"])),
@@ -430,7 +431,9 @@ def plan_person_years(assets):
         for a in assets:
             if a["t"].year == year:
                 for p in a["people"]:
-                    per[p].append(a["id"])
+                    # An empty favorites list means everyone over the threshold.
+                    if not YEAR_PEOPLE or p in YEAR_PEOPLE:
+                        per[p].append(a["id"])
         for p, ids in per.items():
             if len(ids) >= (HOUSEHOLD_YEAR_MIN_PHOTOS if p in HOUSEHOLD else YEAR_MIN_PHOTOS):
                 plans.append({"kind": "person", "key": f"{p}:{year}", "name": f"{p.split()[0]} {year}",
@@ -622,9 +625,9 @@ def main():
     people = fetch_people()
     log(f"Named people: {len(people)}")
     attach_people(assets, people)
-    missing = HOUSEHOLD - {p["name"] for p in people}
+    missing = (HOUSEHOLD | YEAR_PEOPLE) - {p["name"] for p in people}
     if missing:
-        log(f"WARN: household names not found in Immich People: {sorted(missing)}")
+        log(f"WARN: configured names not found in Immich People: {sorted(missing)}")
 
     alist = list(assets.values())
     absorbed = set()

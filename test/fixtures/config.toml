@@ -64,6 +64,7 @@ gather_min_guests = 3
 event_absorb_share = 0.5
 
 [person_years]
+favorites = []   # only these get a yearly album; empty means everyone over the threshold
 min_photos = 50
 household_min_photos = 10
 

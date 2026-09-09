@@ -247,6 +247,16 @@
     "personYears": {
       "type": "object",
       "properties": {
+        "favorites": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Immich person name."
+          },
+          "default": [],
+          "description": "Only these people get a yearly album. Empty means everyone over the threshold."
+        },
         "minPhotos": {
           "type": "integer",
           "minimum": 1,

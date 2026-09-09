@@ -61,7 +61,7 @@ export interface Config {
     gatherMinGuests: number;
     eventAbsorbShare: number;
   };
-  personYears: { minPhotos: number; householdMinPhotos: number };
+  personYears: { favorites: string[]; minPhotos: number; householdMinPhotos: number };
   seasons: { noGpsEraEnd: string; minPhotos: number };
   naming: { districtCountries: string[]; keepRegions: string[] };
   zones: Zone[];

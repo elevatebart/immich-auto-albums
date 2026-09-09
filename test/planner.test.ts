@@ -153,6 +153,18 @@ describe("rule engines", () => {
     ]);
   });
 
+  it("favorites limit person years to the picked people", () => {
+    const A = [
+      ...burst(new Date("2026-02-01T00:00:00Z"), 12, 24, (t) => mk(t, 45.19, 5.72, "Grenoble", null, "France", ["Nadia Rivers", "Alice Martin"])),
+      ...burst(new Date("2026-03-01T00:00:00Z"), 60, 24, (t) => mk(t, 45.19, 5.72, "Grenoble", null, "France", ["Alice Martin"])),
+    ];
+    const persons = (c: typeof cfg) =>
+      plan(c, A, { now: NOW }).plans.filter((p) => p.kind === "person").map((p) => p.name);
+    expect(persons(cfg)).toEqual(["Nadia 2026", "Alice 2026"]);
+    const only = { ...cfg, personYears: { ...cfg.personYears, favorites: ["Nadia Rivers"] } };
+    expect(persons(only)).toEqual(["Nadia 2026"]);
+  });
+
   it("fetches face tags further back than it plans person years", () => {
     const ctx = makeContext(cfg, NOW, 365, "window");
     // Only 2026 is inside the window in full, but London in Sep 2025 still needs its faces.

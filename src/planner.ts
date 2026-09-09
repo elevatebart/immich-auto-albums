@@ -321,6 +321,8 @@ export function yearsCovered(ctx: PlanContext): number[] {
 export function planPersonYears(ctx: PlanContext, assets: Asset[]): Plan[] {
   const { cfg } = ctx;
   const hh = new Set(cfg.people.household);
+  // An empty favorites list means everyone over the threshold, which is what it was before the key.
+  const only = new Set(cfg.personYears.favorites);
   const plans: Plan[] = [];
   // Without a window, the years to consider come from the library rather than from the window's reach.
   const years =
@@ -331,7 +333,10 @@ export function planPersonYears(ctx: PlanContext, assets: Asset[]): Plan[] {
     const per = new Map<string, string[]>();
     for (const a of assets) {
       if (a.t.getUTCFullYear() !== year) continue;
-      for (const p of a.people) (per.get(p) ?? per.set(p, []).get(p)!).push(a.id);
+      for (const p of a.people) {
+        if (only.size && !only.has(p)) continue;
+        (per.get(p) ?? per.set(p, []).get(p)!).push(a.id);
+      }
     }
     for (const [p, ids] of per) {
       const min = hh.has(p) ? cfg.personYears.householdMinPhotos : cfg.personYears.minPhotos;
