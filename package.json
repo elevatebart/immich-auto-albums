@@ -1,6 +1,7 @@
 {
   "name": "immich-auto-albums-ts",
   "version": "1.0.0",
+  "private": true,
   "description": "",
   "main": "index.js",
   "scripts": {
@@ -10,12 +11,14 @@
     "preview": "node --env-file-if-exists=.env dist/cli.js preview",
     "apply": "node --env-file-if-exists=.env dist/cli.js apply",
     "ui": "npm --prefix server run dev",
-    "schema": "node scripts/write-schema.ts"
+    "schema": "node scripts/write-schema.ts",
+    "changeset": "changeset"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "@changesets/cli": "^3.0.2",
     "@types/node": "^26.4.1",
     "typescript": "^7.0.2",
     "vitest": "^5.0.0"

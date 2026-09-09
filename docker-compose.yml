@@ -1,29 +1,17 @@
-# The UI, plus a cli service that exists so the image gets built. See README.md.
+# The UI, which runs wherever you write config.toml. The CLI runs on the NAS from the published
+# image, see README.md.
 services:
   ui:
     image: immich-auto-albums:latest
     build:
       context: .
     command: serve
-    restart: unless-stopped
-    # So the container reaches Immich running on the same NAS.
-    network_mode: host
+    ports:
+      - "3000:3000"
     environment:
-      IMMICH_API_KEY: ${IMMICH_API_KEY:?set it in .env or the shell}
       PORT: 3000
     volumes:
-      # Holds config.toml, receives the logs and CSVs.
-      - /volume1/tools/immich-auto-albums:/data
-
-  # Builds the cli image so a DSM task can run it. Previews once at project
-  # start and exits: the monthly apply is the task, never this service.
-  cli:
-    image: immich-auto-albums:cli
-    build:
-      context: .
-      target: cli
-    command: preview
-    restart: "no"
-    network_mode: host
-    volumes:
-      - /volume1/tools/immich-auto-albums:/data
+      # Holds config.toml, receives the logs and CSVs. Copy the config to the NAS share when done.
+      # ./data/.env is the place for IMMICH_API_KEY, and for IMMICH_URL when it is not the one in
+      # config.toml. Immich on this same machine is http://host.docker.internal:2283, not localhost.
+      - ./data:/data

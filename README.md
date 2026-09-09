@@ -59,29 +59,21 @@ Layout: `src/planner.ts` (pure, no I/O), `src/reconcile.ts` (pure), `src/config.
 
 ## Docker
 
-Two targets. `cli` is the monthly run, the default adds the UI.
+The CLI image is published on every release: `ghcr.io/elevatebart/immich-auto-albums`, `linux/amd64`, built from
+the `cli` target. The UI is not in it. It is a local tool for writing `config.toml`, not something the NAS runs.
 
-    docker build -t immich-auto-albums .                   # CLI + UI, 531 MB
+    docker pull ghcr.io/elevatebart/immich-auto-albums:latest
+
+The package has to be public in the repo's package settings, or the NAS needs a `docker login ghcr.io` with a
+`read:packages` token first.
+
+Building it yourself is still one command each, and the default target adds the UI:
+
     docker build --target cli -t immich-auto-albums:cli .   # CLI only, 350 MB
+    docker build -t immich-auto-albums .                    # CLI + UI, 531 MB
 
-There is no published image, so the NAS has to get one of its own. Building on it needs no SSH: copy the
-checkout to a share, then Container Manager, Project, Create, and point it at that folder. The compose file
-builds both targets, `immich-auto-albums:latest` for the UI service and `immich-auto-albums:cli` for the task.
-The `cli` service is there to get that image built; it previews once and exits, and the monthly apply stays a
-DSM task.
-
-Watch the RAM. Two `npm ci` runs plus `tsc` and the Vite build are heavy for a NAS, and 2 GB is not enough.
-Build on a Mac instead and import the result, which needs `--platform linux/amd64`:
-
-    docker buildx build --platform linux/amd64 --target cli \
-      -t immich-auto-albums:cli --output type=docker,dest=cli.tar .
-
-Copy `cli.tar` to a share and take it in through Container Manager, Image, Add From File. The tag rides inside
-the archive, so nothing needs retagging. `--output type=docker` writes an OCI layout with a root `manifest.json`
-alongside it, which is the part `docker load` reads. Should Container Manager still refuse the file, convert it
-to a plain docker-archive and import that:
-
-    skopeo copy oci-archive:cli.tar docker-archive:cli-legacy.tar:immich-auto-albums:cli
+Do not build on the NAS. Two `npm ci` runs plus `tsc` and the Vite build are heavy, and 2 GB is not enough.
+That is what the registry is for: the NAS only pulls.
 
 `/data` is the only mount: it holds `config.toml` and receives `run_*.log`, `decisions_*.csv` and `plan_*.json`.
 The container runs as root so it can write to a NAS share.
@@ -89,14 +81,16 @@ The container runs as root so it can write to a NAS share.
 Put the key in `/volume1/tools/immich-auto-albums/.env` (`chmod 600`) and the container picks it up, so it never
 appears in a command line or a task definition.
 
-    docker run --rm --network host \
-      -v /volume1/tools/immich-auto-albums:/data immich-auto-albums:cli preview
-    docker run --rm --network host \
-      -v /volume1/tools/immich-auto-albums:/data immich-auto-albums:cli apply
-    docker run -d --network host \
-      -v /volume1/tools/immich-auto-albums:/data immich-auto-albums serve   # UI on :3000
+    docker run --rm --network host -v /volume1/tools/immich-auto-albums:/data \
+      ghcr.io/elevatebart/immich-auto-albums:latest preview
+    docker run --rm --network host -v /volume1/tools/immich-auto-albums:/data \
+      ghcr.io/elevatebart/immich-auto-albums:latest apply
+    docker run -d -p 3000:3000 -v ./data:/data immich-auto-albums serve   # UI on :3000, locally built
 
-`docker-compose.yml` runs the UI. `--network host` is there so the container reaches Immich on the NAS itself.
+`docker-compose.yml` runs that same UI locally: `docker compose up ui`, port 3000, `./data` for `config.toml`
+and its `.env`. No host networking any more, so an Immich on the NAS is its own address and an Immich on this
+machine is `http://host.docker.internal:2283`. Copy the config it writes to the NAS share when you are happy
+with it.
 
 ## Monthly run on DSM
 
@@ -104,9 +98,15 @@ appears in a command line or a task definition.
 2. Control Panel, Task Scheduler, Create, Scheduled Task, User-defined script. User `root`, monthly, day 1.
 3. Run command:
 
-       /usr/local/bin/docker run --rm --network host \
-         -v /volume1/tools/immich-auto-albums:/data \
-         immich-auto-albums:cli apply --all
+       /usr/local/bin/docker pull ghcr.io/elevatebart/immich-auto-albums:latest && \
+         /usr/local/bin/docker run --rm --network host \
+           -v /volume1/tools/immich-auto-albums:/data \
+           ghcr.io/elevatebart/immich-auto-albums:latest apply --all
+
+The pull is the whole update mechanism: every run starts on the newest release, and there is no image to carry
+over by hand any more. `&&` means a registry outage skips the run instead of quietly applying an old planner;
+swap it for `;` if you would rather run stale than not run. Pin `:latest` to `:1.2.0` to put a human between a
+release and your library.
 
 Run it with `preview` once by hand first: it writes the same decision CSV without touching Immich. Enable the
 task's email notification to get the run log.
@@ -118,3 +118,17 @@ safe, just narrower.
 `/data` is the only mount, and the image already sets `CONFIG=/data/config.toml` and `OUT=/data`. A config under
 another name needs `-e CONFIG=/data/<name>.toml`, and `IMMICH_URL` only when it differs from `immich.url` in the
 config. There is no `DRY_RUN`: `preview` writes nothing, `apply` writes, and that is the whole switch.
+
+## Releasing
+
+Changesets, one package, one version for the whole tool. Anything worth a release carries one:
+
+    npx changeset       # major/minor/patch, one line of prose, commit the file it writes
+
+Pushing to `main` collects the pending ones into a `Version Packages` PR. Merging that PR bumps `package.json`,
+writes `CHANGELOG.md`, tags `v<version>`, and pushes the image at both `<version>` and `latest`. Nothing goes to
+npm: the package is private and `changeset git-tag` is the publish step.
+
+The image build is a reusable workflow (`.github/workflows/image.yml`), so a release whose push failed can be
+replayed from the Actions tab by running `image` with the version. The release workflow calls it as a job rather
+than triggering on the tag, because a tag pushed with `GITHUB_TOKEN` starts no workflow of its own.
