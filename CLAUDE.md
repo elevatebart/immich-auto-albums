@@ -140,12 +140,24 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 2. Done. `src/schema.ts` holds the schema, `config.schema.json` is the generated artifact for outside consumers, and
    the form takes every slider range and hint from it.
 3. Done. `Dockerfile` has a `cli` target for the scheduled run and a default target that adds the UI, both on
-   `node:22-slim` with `/data` as the only mount. README has the DSM task. Cross-builds to amd64 for the NAS.
+   `node:22-slim` with `/data` as the only mount. README has the DSM task, which pulls the published
+   `linux/amd64` image before every run.
 
 ## Docker
 - `cli` target: root deps plus `dist`. Default target adds `server/build` and the server deps.
 - `docker/entrypoint.sh` dispatches `preview`, `apply`, `serve`, anything else runs verbatim.
 - Never bake `config.toml` into an image: `.dockerignore` excludes it.
+- Only the `cli` target is published, to `ghcr.io/elevatebart/immich-auto-albums`: the UI is a local tool for
+  writing the config, the NAS pulls the CLI and runs it from a DSM task.
+
+## Releases
+- Changesets, single package (`server/` is not a workspace, so it has no version of its own). `npx changeset`
+  writes the intent, `.github/workflows/release.yml` turns pending ones into a `Version Packages` PR, and
+  merging it runs `changeset git-tag` for `v<version>`. The root package is private: nothing reaches npm.
+- The release job then calls `.github/workflows/image.yml` as a reusable workflow, because a tag pushed with
+  `GITHUB_TOKEN` triggers nothing. That workflow also takes a `workflow_dispatch` version to replay a build.
+- The action is v2: it hands the publish script `CHANGESETS_OUTPUT` and reads the ndjson the CLI writes there,
+  so the publish script has to be the changesets CLI (`changeset git-tag`), not a hand-rolled `git tag`.
 
 ## Running
     npm ci && npm run build && npm test

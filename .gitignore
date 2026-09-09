@@ -15,8 +15,11 @@ server/build/
 
 __pycache__/
 
-# Image archives built for the NAS import.
+# Image archives.
 *.tar
+
+# The UI's mount when it runs from docker-compose: config, logs, and the key.
+/data/
 
 run_*.log
 decisions_*.csv
