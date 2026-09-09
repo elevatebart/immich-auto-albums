@@ -64,19 +64,21 @@ Two targets. `cli` is the monthly run, the default adds the UI.
     docker build -t immich-auto-albums .                   # CLI + UI, 531 MB
     docker build --target cli -t immich-auto-albums:cli .   # CLI only, 350 MB
 
-Building on a Mac for a Synology needs `--platform linux/amd64`. Both targets cross-build, or build on the
-NAS itself over SSH.
+There is no published image, so the NAS has to get one of its own. Building on it needs no SSH: copy the
+checkout to a share, then Container Manager, Project, Create, and point it at that folder. The compose file
+builds both targets, `immich-auto-albums:latest` for the UI service and `immich-auto-albums:cli` for the task.
+The `cli` service is there to get that image built; it previews once and exits, and the monthly apply stays a
+DSM task.
 
-    docker build --platform linux/amd64 --target cli -t immich-auto-albums:cli .
+Watch the RAM. Two `npm ci` runs plus `tsc` and the Vite build are heavy for a NAS, and 2 GB is not enough.
+Build on a Mac instead and import the result, which needs `--platform linux/amd64`:
 
-There is no published image, so a Mac build has to be carried over. Either pipe it:
+    docker buildx build --platform linux/amd64 --target cli \
+      -t immich-auto-albums:cli --output type=docker,dest=cli.tar .
 
-    docker save immich-auto-albums:cli | gzip | ssh bart@nas 'sudo /usr/local/bin/docker load'
-
-or, when `sudo` over SSH wants a password, drop the tarball on the share and load it from a one-shot DSM task:
-
-    docker save immich-auto-albums:cli | gzip > /Volumes/tools/immich-auto-albums/cli.tar.gz
-    /usr/local/bin/docker load -i /volume1/tools/immich-auto-albums/cli.tar.gz
+Copy `cli.tar` to a share and take it in through Container Manager, Image, Add From File. The tag rides inside
+the archive, so nothing needs retagging. `--output type=docker` is what makes it importable: with Docker
+Desktop's containerd image store, plain `docker save` writes an OCI archive that DSM's older engine rejects.
 
 `/data` is the only mount: it holds `config.toml` and receives `run_*.log`, `decisions_*.csv` and `plan_*.json`.
 The container runs as root so it can write to a NAS share.
