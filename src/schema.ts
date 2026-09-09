@@ -65,6 +65,7 @@ export const configSchema = {
       eventAbsorbShare: { ...num(0, 1, "Share of a cluster's photos and of its days inside a hand-declared event before it folds into that event."), default: 0.5 },
     }),
     personYears: obj({
+      favorites: { type: "array", items: text("Immich person name."), default: [], description: "Only these people get a yearly album. Empty means everyone over the threshold." },
       minPhotos: int(1, 5000, "Minimum photos of a person in a year for their album."),
       householdMinPhotos: int(1, 5000, "Same, for household members."),
     }),

@@ -45,6 +45,7 @@ gather_min_guests = 3     # named faces at home who are not household
 event_absorb_share = 0.5  # this share of a cluster's photos and days inside an event folds it into that event
 
 [person_years]
+favorites = ["Your Name", "Your Partner"]   # only these get a yearly album; empty means everyone over the threshold
 min_photos = 50
 household_min_photos = 10
 

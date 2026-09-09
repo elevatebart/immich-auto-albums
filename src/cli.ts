@@ -76,8 +76,9 @@ const people = await client.fetchPeople();
 log(`Named people: ${people.length}`);
 const counts = await client.attachPeople(assets, people, taggedSince(ctx));
 for (const [name, n] of Object.entries(counts)) log(`  people: ${name} -> ${n}`);
-const missing = cfg.people.household.filter((h) => !people.some((p) => p.name === h));
-if (missing.length) log(`WARN: household names not found in Immich People: ${missing.join(", ")}`);
+const named = [...cfg.people.household, ...cfg.personYears.favorites];
+const missing = [...new Set(named)].filter((h) => !people.some((p) => p.name === h));
+if (missing.length) log(`WARN: configured names not found in Immich People: ${missing.join(", ")}`);
 
 const { plans, absorbed, folded } = plan(cfg, [...assets.values()], { windowDays, scope });
 const byKind = plans.reduce<Record<string, number>>((m, p) => ((m[p.kind] = (m[p.kind] ?? 0) + 1), m), {});

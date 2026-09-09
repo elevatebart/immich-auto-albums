@@ -529,7 +529,17 @@
 			{@render heading('Person years and seasons', ['personYears', 'seasons'])}
 		</CardHeader>
 		<CardBody>
-			<Stack gap={2}>
+			<Stack gap={4}>
+				<ChangeFrame {diff} path="personYears.favorites">
+					<PeoplePicker
+						label="Yearly albums for"
+						description={hint('personYears.favorites')}
+						{people}
+						selected={config.personYears.favorites}
+						onchange={(names) => (config.personYears.favorites = names)}
+					/>
+					<GoneList {diff} path="personYears.favorites" />
+				</ChangeFrame>
 				<Slider
 					label="Person year minimum photos"
 					field="personYears.minPhotos"

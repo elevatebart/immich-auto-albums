@@ -49,7 +49,7 @@ export function fromToml(text: string): Config {
       gatherMinGuests: cl.gather_min_guests,
       eventAbsorbShare: cl.event_absorb_share ?? 0.5,
     },
-    personYears: { minPhotos: py.min_photos, householdMinPhotos: py.household_min_photos },
+    personYears: { favorites: py.favorites ?? [], minPhotos: py.min_photos, householdMinPhotos: py.household_min_photos },
     seasons: { noGpsEraEnd: se.no_gps_era_end === undefined ? undefined : day(se.no_gps_era_end), minPhotos: se.min_photos ?? 5 },
     zones: ((c.zones ?? []) as Raw[]).map((z) => ({ name: z.name, lat: z.lat, lon: z.lon, km: z.km })),
     naming: {
@@ -133,6 +133,7 @@ export function toToml(c: Config): string {
   }
 
   head("[person_years]");
+  row("favorites", list(c.personYears.favorites), "only these get a yearly album; empty means everyone over the threshold");
   row("min_photos", c.personYears.minPhotos);
   row("household_min_photos", c.personYears.householdMinPhotos);
 
