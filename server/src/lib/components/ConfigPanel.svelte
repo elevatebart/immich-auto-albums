@@ -313,7 +313,7 @@
 								</td>
 								<td class="py-1">
 									<HStack gap={1}>
-										<ChangeBadge {diff} path={`homes[${i}]`} />
+										<ChangeBadge {diff} path={`homes[${i}]`} compact />
 										<IconButton
 											icon={mdiDelete}
 											variant="ghost"
@@ -605,7 +605,7 @@
 						<Text color="muted">to</Text>
 						<Input size="small" bind:value={row.to} placeholder="London" />
 						{#if row.from.trim()}
-							<ChangeBadge {diff} path={`aliases.${row.from.trim()}`} />
+							<ChangeBadge {diff} path={`aliases.${row.from.trim()}`} compact />
 						{/if}
 						<IconButton
 							icon={mdiDelete}
@@ -646,7 +646,7 @@
 						<Input size="small" bind:value={event.name} placeholder="Our wedding" />
 						<Input type="date" size="small" bind:value={event.from} />
 						<Input type="date" size="small" bind:value={event.to} />
-						<ChangeBadge {diff} path={`events[${i}]`} />
+						<ChangeBadge {diff} path={`events[${i}]`} compact />
 						<IconButton
 							icon={mdiDelete}
 							variant="ghost"

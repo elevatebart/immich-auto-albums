@@ -72,7 +72,8 @@ session token is ever sent to the browser or written to the config. `server/.env
   Every field also says how it differs from a baseline: the bar at the top counts the changes and switches between
   the saved file and `config.example.toml`, each card header carries its own count, a changed control gets an amber
   accent, a `changed`/`new` badge and a `was ...` value, and an entry the baseline has and the config does not is
-  listed struck through under its section. `src/lib/change.ts` holds the wording and the colours, `$core/diff.js`
+  listed struck through under its section. Rows with no room for a word (a home, an alias, an event) carry a
+  coloured dot with the same tooltip instead. `src/lib/change.ts` holds the wording and the colours, `$core/diff.js`
   the comparison.
   Right (`AlbumsPanel.svelte`): the planned albums with create, update, rename, kept-name and unchanged badges, four
   thumbnails per row, the album name opening a full grid in a modal with the joining and leaving photos ringed, a

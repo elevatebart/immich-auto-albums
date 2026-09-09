@@ -25,6 +25,10 @@ export const accent = (kind?: ChangeKind) => {
 	return `border-s-2 ps-2 ${color}`;
 };
 
+/** Dot for a row too tight for a badge: the colour carries the kind, the tooltip the detail. */
+export const dot = (kind: ChangeKind) =>
+	kind === 'added' ? 'bg-success' : kind === 'removed' ? 'bg-danger' : 'bg-warning';
+
 /** A config value as one line of text, for the tooltip that says what it used to be. */
 export function valueText(value: unknown): string {
 	if (value === undefined || value === null || value === '') return 'empty';
