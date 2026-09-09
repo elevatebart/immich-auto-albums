@@ -26,6 +26,10 @@ export async function readConfigFile() {
 	}
 }
 
+/** What the library fetch itself depends on. Everything else is planner input over the same assets. */
+const fetchShape = (c: Config) =>
+	JSON.stringify([c.immich.url, c.immich.marker, c.naming.districtCountries]);
+
 /** Backup first, then write through a temp file in the same directory so the swap is atomic. */
 export async function writeConfigFile(next: Config, etag: string) {
 	const current = await readConfigFile();
@@ -36,7 +40,8 @@ export async function writeConfigFile(next: Config, etag: string) {
 	await copyFile(current.file, `${current.file}.bak`);
 	await writeFile(`${current.file}.tmp`, text);
 	await rename(`${current.file}.tmp`, current.file);
-	invalidate();
+	// A wider window needs no help here: getSnapshot refetches on its own when the reach grows.
+	if (fetchShape(current.config) !== fetchShape(next)) invalidate();
 	return { file: current.file, text, etag: etagOf(text), backup: `${current.file}.bak` };
 }
 
