@@ -3,8 +3,19 @@
 /* Tailwind must see the class strings inside the prebuilt @immich/ui components. */
 @source '../node_modules/@immich/ui/dist';
 
+/* The theme flips its variables on the class, so native widgets need the hint too. */
+:root {
+	color-scheme: light;
+}
+
+:root.dark {
+	color-scheme: dark;
+}
+
+/* @immich/ui inputs are bg-transparent with no color of their own, so they inherit this. */
 body {
 	background-color: var(--immich-ui-gray);
+	color: var(--immich-ui-dark);
 }
 
 /* Leaflet's panes use z-index 400 and up, which would sit over a z-50 modal. */

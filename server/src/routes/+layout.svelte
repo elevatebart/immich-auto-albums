@@ -1,23 +1,12 @@
 <script lang="ts">
 	import { Container, HStack, Logo, Text, ThemeSwitcher, TooltipProvider } from '@immich/ui';
-	import { onMount } from 'svelte';
 	import favicon from '$lib/assets/favicon.svg';
 	import '../app.css';
 
 	let { children } = $props();
 
-	/** ThemeSwitcher writes the class on toggle only, so put the stored choice back on load. */
-	onMount(() => {
-		try {
-			const pref = JSON.parse(localStorage.getItem('immich-ui-theme') ?? '""');
-			if (pref === 'dark' || pref === 'light') {
-				document.documentElement.classList.toggle('dark', pref === 'dark');
-				document.documentElement.classList.toggle('light', pref === 'light');
-			}
-		} catch {
-			// no stored preference, the system one applies
-		}
-	});
+	// ThemeSwitcher writes the class on toggle only. The stored choice, or the OS one when there is
+	// none, goes on in the app.html head script so there is no light flash before hydration.
 </script>
 
 <svelte:head>
