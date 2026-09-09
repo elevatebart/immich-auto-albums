@@ -89,7 +89,16 @@ appears in a command line or a task definition.
 3. Run command:
 
        /usr/local/bin/docker run --rm --network host \
-         -v /volume1/tools/immich-auto-albums:/data immich-auto-albums:cli apply
+         -v /volume1/tools/immich-auto-albums:/data \
+         immich-auto-albums:cli apply --all
 
 Run it with `preview` once by hand first: it writes the same decision CSV without touching Immich. Enable the
 task's email notification to get the run log.
+
+`--all` plans the whole library, which is what a monthly run wants: without it the rolling window of
+`window_days` is all that gets revisited, so older person years and seasons stop being touched. Dropping it is
+safe, just narrower.
+
+`/data` is the only mount, and the image already sets `CONFIG=/data/config.toml` and `OUT=/data`. A config under
+another name needs `-e CONFIG=/data/<name>.toml`, and `IMMICH_URL` only when it differs from `immich.url` in the
+config. There is no `DRY_RUN`: `preview` writes nothing, `apply` writes, and that is the whole switch.
