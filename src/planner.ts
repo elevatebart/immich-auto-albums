@@ -153,6 +153,19 @@ function districtName(cfg: Config, gps: Asset[], need: number): string | null {
   return null;
 }
 
+/** Two places of one region carrying the trip, where the district would otherwise have named it. */
+function pairName(cfg: Config, places: Group[], need: number): string | null {
+  const [x, y] = places;
+  if (!y || x.items.length + y.items.length < need) return null;
+  const region = commonest(x.items.map((a) => a.state))?.[0];
+  if (!region || region !== commonest(y.items.map((a) => a.state))?.[0]) return null;
+  const both = [...x.items, ...y.items];
+  // Only where a district would have named the album: with no district known the region still wins.
+  if (!prefersDistricts(cfg, both, region) || !districtName(cfg, both, 0)) return null;
+  const [a, b] = [label(cfg, x.items), label(cfg, y.items)];
+  return a && b && a !== b ? `${a} & ${b}` : null;
+}
+
 /** Above city level: the district when the country prefers it, else the region. */
 function areaName(cfg: Config, gps: Asset[], share: number): string | null {
   const need = share * gps.length;
@@ -162,7 +175,7 @@ function areaName(cfg: Config, gps: Asset[], share: number): string | null {
   return districtName(cfg, gps, need) ?? (enough ? normPlace(cfg, region[0]) : null);
 }
 
-/** City if one place dominates, else district or region, else country, else two countries. */
+/** City if one place dominates, else two cities of a region, else district or region, else country. */
 export function placeName(cfg: Config, cluster: Asset[]): string {
   const gps = cluster.filter(hasGps);
   const places: Group[] = [];
@@ -178,7 +191,9 @@ export function placeName(cfg: Config, cluster: Asset[]): string {
     return label(cfg, top) ?? areaName(cfg, top, 0) ?? label(cfg, top, "country") ?? "Trip";
   }
   // One area holding most of the photos names the trip on its own; the rest is a detour.
-  const area = zoneName(cfg, gps) ?? areaName(cfg, gps, cfg.clustering.regionShare);
+  const area = zoneName(cfg, gps)
+    ?? pairName(cfg, places, cfg.clustering.dominantShare * gps.length)
+    ?? areaName(cfg, gps, cfg.clustering.regionShare);
   if (area) return area;
   const countries = counted(gps.map((a) => normPlace(cfg, a.country)));
   if (countries.size === 1) return [...countries.keys()][0];

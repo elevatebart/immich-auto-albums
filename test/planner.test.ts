@@ -94,8 +94,10 @@ describe("rule engines", () => {
         Array.from({ length: count }, () => mk(new Date(b.getTime() + n++ * 6 * H), lat, lon, city, state, "France", [], district)));
     };
     const A = [
-      // Two departements of one region: the region is dropped, both departements are named.
+      // Two towns of one region carrying the trip: the towns are named, not their departements.
       ...trip(0, [[45.52, 4.87, "Vienne", "Rhône-Alpes", "Isère", 10], [44.93, 4.89, "Valence", "Rhône-Alpes", "Drôme", 8]]),
+      // The same pair split over two regions: no town pair, so the two departements name it.
+      ...trip(180, [[45.52, 4.87, "Vienne", "Rhône-Alpes", "Isère", 10], [47.32, 5.04, "Dijon", "Bourgogne", "Côte-d'Or", 8]]),
       // Three of them: no pair carries the trip, so the region comes back.
       ...trip(30, [[45.52, 4.87, "Vienne", "Rhône-Alpes", "Isère", 8], [44.93, 4.89, "Valence", "Rhône-Alpes", "Drôme", 6], [45.57, 5.92, "Chambéry", "Rhône-Alpes", "Savoie", 6]]),
       // Kept regions name the trip themselves, and an alias renames one of them.
@@ -107,12 +109,13 @@ describe("rule engines", () => {
       ...trip(120, [[41.88, -87.63, "Chicago", "Illinois", null, 8], [42.05, -88.08, "Schaumburg", "Illinois", null, 6], [41.5, -90.5, "Moline", "Illinois", null, 5]]),
     ];
     expect(planTrips(ctx, A).map((p) => p.name)).toEqual([
-      "Isère & Drôme, Jan 2025",
+      "Vienne & Valence, Jan 2025",
       "Rhône-Alpes, Jan-Feb 2025",
       "Normandy, Mar 2025",
       "Paris, Apr 2025",
       "Illinois, May 2025",
       "Mountains around Grenoble, May-Jun 2025",
+      "Isère & Côte-d'Or, Jun-Jul 2025",
     ]);
   });
 
