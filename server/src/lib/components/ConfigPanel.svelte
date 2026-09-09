@@ -380,6 +380,14 @@
 					{issues}
 				/>
 				<Slider
+					label="Place radius cap"
+					field="clustering.placeKmMax"
+					bind:value={config.clustering.placeKmMax}
+					step={0.5}
+					unit="km"
+					{issues}
+				/>
+				<Slider
 					label="Label merge radius"
 					field="clustering.mergeLabelKm"
 					bind:value={config.clustering.mergeLabelKm}

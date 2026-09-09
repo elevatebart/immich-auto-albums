@@ -47,6 +47,7 @@ export interface Config {
   clustering: {
     homeKm: number;
     placeKm: number;
+    placeKmMax: number;
     mergeLabelKm: number;
     dominantShare: number;
     regionShare: number;

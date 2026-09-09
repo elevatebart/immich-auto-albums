@@ -35,6 +35,7 @@ export function fromToml(text: string): Config {
     clustering: {
       homeKm: cl.home_km,
       placeKm: cl.place_km,
+      placeKmMax: cl.place_km_max ?? 25,
       mergeLabelKm: cl.merge_label_km,
       dominantShare: cl.dominant_share,
       regionShare: cl.region_share ?? 0.8,
@@ -114,6 +115,7 @@ export function toToml(c: Config): string {
   for (const [k, v] of [
     ["home_km", c.clustering.homeKm],
     ["place_km", c.clustering.placeKm],
+    ["place_km_max", c.clustering.placeKmMax],
     ["merge_label_km", c.clustering.mergeLabelKm],
     ["dominant_share", c.clustering.dominantShare],
     ["region_share", c.clustering.regionShare],

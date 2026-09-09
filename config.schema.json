@@ -146,6 +146,13 @@
           "maximum": 500,
           "description": "Groups photos around a running centroid before naming a place."
         },
+        "placeKmMax": {
+          "type": "number",
+          "minimum": 0.1,
+          "maximum": 500,
+          "description": "Cap for that radius as it grows with how spread out the trip is. At or below the place radius the growth is off.",
+          "default": 25
+        },
         "mergeLabelKm": {
           "type": "number",
           "minimum": 0.1,

@@ -68,6 +68,23 @@ describe("rule engines", () => {
     ]);
   });
 
+  it("a spread out trip groups places coarsely, a tight one does not", () => {
+    const ctx = makeContext(cfg, NOW, 9000);
+    const spots = (off: number, xs: [number, number, string, string, number][]) => {
+      const b = new Date(Date.UTC(2025, 0, 1 + off));
+      let n = 0;
+      return xs.flatMap(([lat, lon, city, state, count]) =>
+        Array.from({ length: count }, () => mk(new Date(b.getTime() + n++ * 6 * H), lat, lon, city, state, "Japan")));
+    };
+    // 370 km between the legs lifts the radius to its cap, so two Tokyo spots 18 km apart are one place.
+    const wide = spots(0, [[35.69, 139.7, "Tokyo", "Kanto", 10], [35.63, 139.88, "Tokyo", "Kanto", 8], [35.01, 135.77, "Kyoto", "Kansai", 6]]);
+    // The same two spots on their own stay 18 km apart, past both the base radius and the label merge.
+    const tight = spots(30, [[35.69, 139.7, "Tokyo", "Kanto", 10], [35.63, 139.88, "Chiba", "Kanto", 8]]);
+    expect(planTrips(ctx, [...wide, ...tight]).map((p) => p.name)).toEqual(["Tokyo, Jan 2025", "Kanto, Jan-Feb 2025"]);
+    const off = { ...cfg, clustering: { ...cfg.clustering, placeKmMax: cfg.clustering.placeKm } };
+    expect(planTrips(makeContext(off, NOW, 9000), wide).map((p) => p.name)).toEqual(["Japan, Jan 2025"]);
+  });
+
   it("a French departement names the trip, unless the region is one to keep", () => {
     const ctx = makeContext(cfg, NOW, 9000);
     const trip = (off: number, spots: [number, number, string, string, string | null, number][]) => {
