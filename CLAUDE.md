@@ -40,14 +40,12 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   same config, saved or draft, so a write always matches a plan someone looked at. Apply needs the preview token plus `confirm: true`, and
   `apply.ts` is the only path that mutates Immich. Config writes need the file etag, are validated field by field in
   `config-io.ts`, keep a `.bak` and swap through a temp file. `DEMO=1` swaps in a fixture library, apply then dry runs.
-- `python/immich_auto_albums.py`: the original stdlib implementation this was ported from, reading the same
-  `config.toml`. Kept working; see `python/README.md` for where the two differ.
 - `test/planner.test.ts`: golden cases. Run `npm test` before and after any planner change. Tests read
   `test/fixtures/config.toml`, never the real one.
 
 ## Config files
-- The TOML format has two readers, `src/config.ts` and `python/immich_auto_albums.py`. A change to it means
-  checking both, and dates stay bare TOML dates because the Python side compares real `date` objects.
+- `src/config.ts` is the only reader of the TOML format. Dates stay bare TOML dates: `toToml` writes them bare
+  and the schema documents `YYYY-MM-DD`, though `fromToml` also accepts them quoted.
 - `config.toml` is local and gitignored: it holds homes and household names. `config.example.toml` is the committed
   starting point, `test/fixtures/config.toml` is the tests' own copy, `config.schema.json` is the generated schema.
 - A missing config answers 404 on every route with the hint to copy the example, and the CLI exits 1 with the same.
