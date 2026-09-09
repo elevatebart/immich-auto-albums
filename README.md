@@ -53,12 +53,9 @@ looking at the album.
 
 `config.schema.json` is the JSON Schema for the config, generated with `npm run schema`.
 
-`python/immich_auto_albums.py` is the original single-file version, stdlib only, reading the same `config.toml`.
-See `python/README.md`.
-
 Layout: `src/planner.ts` (pure, no I/O), `src/reconcile.ts` (pure), `src/config.ts` (TOML -> Config),
 `src/schema.ts` + `src/validate.ts` (JSON Schema and Ajv validation),
-`src/immich.ts` (fetch client), `src/cli.ts`. `test/` holds the golden cases ported from the Python version.
+`src/immich.ts` (fetch client), `src/cli.ts`. `test/` holds the golden cases.
 
 ## Docker
 
@@ -67,8 +64,24 @@ Two targets. `cli` is the monthly run, the default adds the UI.
     docker build -t immich-auto-albums .                   # CLI + UI, 531 MB
     docker build --target cli -t immich-auto-albums:cli .   # CLI only, 350 MB
 
-Building on a Mac for a Synology needs `--platform linux/amd64`. Both targets cross-build, or build on the
-NAS itself over SSH.
+There is no published image, so the NAS has to get one of its own. Building on it needs no SSH: copy the
+checkout to a share, then Container Manager, Project, Create, and point it at that folder. The compose file
+builds both targets, `immich-auto-albums:latest` for the UI service and `immich-auto-albums:cli` for the task.
+The `cli` service is there to get that image built; it previews once and exits, and the monthly apply stays a
+DSM task.
+
+Watch the RAM. Two `npm ci` runs plus `tsc` and the Vite build are heavy for a NAS, and 2 GB is not enough.
+Build on a Mac instead and import the result, which needs `--platform linux/amd64`:
+
+    docker buildx build --platform linux/amd64 --target cli \
+      -t immich-auto-albums:cli --output type=docker,dest=cli.tar .
+
+Copy `cli.tar` to a share and take it in through Container Manager, Image, Add From File. The tag rides inside
+the archive, so nothing needs retagging. `--output type=docker` writes an OCI layout with a root `manifest.json`
+alongside it, which is the part `docker load` reads. Should Container Manager still refuse the file, convert it
+to a plain docker-archive and import that:
+
+    skopeo copy oci-archive:cli.tar docker-archive:cli-legacy.tar:immich-auto-albums:cli
 
 `/data` is the only mount: it holds `config.toml` and receives `run_*.log`, `decisions_*.csv` and `plan_*.json`.
 The container runs as root so it can write to a NAS share.
@@ -92,7 +105,16 @@ appears in a command line or a task definition.
 3. Run command:
 
        /usr/local/bin/docker run --rm --network host \
-         -v /volume1/tools/immich-auto-albums:/data immich-auto-albums:cli apply
+         -v /volume1/tools/immich-auto-albums:/data \
+         immich-auto-albums:cli apply --all
 
 Run it with `preview` once by hand first: it writes the same decision CSV without touching Immich. Enable the
 task's email notification to get the run log.
+
+`--all` plans the whole library, which is what a monthly run wants: without it the rolling window of
+`window_days` is all that gets revisited, so older person years and seasons stop being touched. Dropping it is
+safe, just narrower.
+
+`/data` is the only mount, and the image already sets `CONFIG=/data/config.toml` and `OUT=/data`. A config under
+another name needs `-e CONFIG=/data/<name>.toml`, and `IMMICH_URL` only when it differs from `immich.url` in the
+config. There is no `DRY_RUN`: `preview` writes nothing, `apply` writes, and that is the whole switch.

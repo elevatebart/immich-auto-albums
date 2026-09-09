@@ -1,4 +1,4 @@
-# The UI. The monthly run is a DSM task, not a service: see README.md.
+# The UI, plus a cli service that exists so the image gets built. See README.md.
 services:
   ui:
     image: immich-auto-albums:latest
@@ -13,4 +13,17 @@ services:
       PORT: 3000
     volumes:
       # Holds config.toml, receives the logs and CSVs.
+      - /volume1/tools/immich-auto-albums:/data
+
+  # Builds the cli image so a DSM task can run it. Previews once at project
+  # start and exits: the monthly apply is the task, never this service.
+  cli:
+    image: immich-auto-albums:cli
+    build:
+      context: .
+      target: cli
+    command: preview
+    restart: "no"
+    network_mode: host
+    volumes:
       - /volume1/tools/immich-auto-albums:/data
