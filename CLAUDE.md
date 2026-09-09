@@ -13,6 +13,10 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   from a fixed template). TOML keys are snake_case, `Config` is camelCase.
 - `src/schema.ts`: JSON Schema 2020-12 for `Config`, plus `schemaField(path)`. No validator import, so a form can
   pull ranges and descriptions without Ajv. `config.schema.json` is generated from it by `npm run schema`.
+- `src/diff.ts`: pure. `diffConfig(base, next) -> { changes, gone }` keyed by the form's field paths, plus `kindAt`,
+  `countAt` and `countAll` for a container or a card header. Array items pair up by identity first (a home by its
+  date, an event by name and date, a zone circle by its rank inside its name) and by position for what is left, so
+  an edited row reads as changed and a deleted one as gone. Name lists are compared as sets, `aliases` by key.
 - `src/validate.ts`: `validateConfig(raw) -> { config, issues }` on Ajv. Fills defaults, collects every problem, and
   adds the order rules JSON Schema cannot express (homes chronological, event `to` after `from`).
 - `src/immich.ts`: fetch client for the Immich REST API (`/api` prefix). `request()` and `authHeader()` are shared
@@ -29,7 +33,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   types. Routes: `GET`/`POST`/`PUT`/`DELETE /api/auth` (state, sign in or mint a key with `?key=1`, save a key,
   sign out), `GET`/`POST /api/preview` (saved config, draft config), `POST /api/apply`, `GET`/`PUT /api/config`,
   `GET /api/people`, `GET /api/people/<id>/thumbnail`, `GET /api/assets/<id>/thumbnail`, `POST /api/albums/assets`,
-  `GET /api/geocode`, `GET /api/towns`, `GET /api/progress`. One page, `/`: the sign in card when there is no credential and no
+  `GET /api/geocode`, `GET /api/towns`, `GET /api/progress`. `GET /api/config` also returns the parsed
+  `config.example.toml` as `defaults`, the second baseline the form highlights changes against. One page, `/`: the sign in card when there is no credential and no
   `DEMO=1`, otherwise handles left, albums right, with the account bar and the optional API key card above the
   config form. Apply takes a token that must match a replan of the
   same config, saved or draft, so a write always matches a plan someone looked at. Apply needs the preview token plus `confirm: true`, and
@@ -126,7 +131,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
    clustering sliders, the face-tile people picker, an address lookup for the homes, a zone editor (one modal per
    zone: a relief map with its circles, draggable, plus the towns each circle catches from `GET /api/towns`),
    event date pickers, and the album list with badges, thumbnails and a modal that shows the whole album plus,
-   for a trip, where its photos were taken.
+   for a trip, where its photos were taken. The form covers every config key, and highlights what the config on
+   screen changes about the saved file or about `config.example.toml`.
 2. Done. `src/schema.ts` holds the schema, `config.schema.json` is the generated artifact for outside consumers, and
    the form takes every slider range and hint from it.
 3. Done. `Dockerfile` has a `cli` target for the scheduled run and a default target that adds the UI, both on

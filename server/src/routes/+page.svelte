@@ -11,6 +11,7 @@
 	} from '@mdi/js';
 	import { Alert, Button, Checkbox, ConfirmModal, HStack, Heading, Stack, Text } from '@immich/ui';
 	import type { ConfigIssue } from '$core/schema.js';
+	import { diffConfig, EMPTY_DIFF } from '$core/diff.js';
 	import type { Config, Scope } from '$core/types.js';
 	import AlbumsPanel from '$lib/components/AlbumsPanel.svelte';
 	import ApiKeyCard from '$lib/components/ApiKeyCard.svelte';
@@ -20,6 +21,7 @@
 	import type {
 		ApplyResponse,
 		AuthState,
+		Baseline,
 		ConfigResponse,
 		ConfigWriteResponse,
 		PeopleResponse,
@@ -34,6 +36,9 @@
 	let etag = $state('');
 	let file = $state('');
 	let pristine = $state('');
+	/** config.example.toml, the other baseline the form can highlight against. */
+	let defaults = $state<Config | null>(null);
+	let baseline = $state<Baseline>('saved');
 	let toml = $state('');
 	let people = $state<Person[]>([]);
 	let peopleNote = $state('');
@@ -64,6 +69,12 @@
 		};
 
 	const dirty = $derived(!!config && JSON.stringify(payload()) !== pristine);
+	const savedConfig = $derived(pristine ? (JSON.parse(pristine) as Config) : null);
+	const diff = $derived.by(() => {
+		const next = payload();
+		const base = baseline === 'defaults' ? defaults : savedConfig;
+		return next && base ? diffConfig(base, next as Config) : EMPTY_DIFF;
+	});
 	const changed = $derived((shown?.rows ?? []).filter((r) => r.op !== 'noop'));
 	const canApply = $derived(!!shown && !recomputing && !scanning);
 	const chosen = $derived(changed.filter((r) => selected.has(r.id)));
@@ -127,6 +138,8 @@
 			etag = data.etag;
 			file = data.file;
 			toml = data.toml;
+			defaults = data.defaults ?? null;
+			if (!data.defaults) baseline = 'saved';
 			issues = [];
 			warnings = [];
 			pristine = JSON.stringify(payload());
@@ -337,7 +350,18 @@
 				<div class="mb-3"><ApiKeyCard /></div>
 			{/if}
 			{#if config}
-				<ConfigPanel bind:config bind:aliasRows {issues} {people} {peopleNote} {toml} />
+				<ConfigPanel
+					bind:config
+					bind:aliasRows
+					{issues}
+					{people}
+					{peopleNote}
+					{toml}
+					{diff}
+					{baseline}
+					hasDefaults={!!defaults}
+					onbaseline={(next) => (baseline = next)}
+				/>
 			{:else if busy}
 				<Text color="muted">Reading config.toml...</Text>
 			{/if}

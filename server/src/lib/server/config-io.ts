@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { copyFile, readFile, rename, writeFile } from 'node:fs/promises';
+import path from 'node:path';
 import { fromToml, toToml } from '$core/config.js';
 import type { Config } from '$core/types.js';
 import { configPath, invalidate, missingConfig, PreviewError } from './preview';
@@ -24,6 +25,21 @@ export async function readConfigFile() {
 	} catch (e) {
 		throw new PreviewError(500, `${file} is not valid: ${(e as Error).message}`);
 	}
+}
+
+/** The committed starting point, which the form diffs against as the defaults. */
+export async function readExampleConfig(): Promise<Config | null> {
+	const name = 'config.example.toml';
+	// Beside the config first, then the cwd, which is /app in the container and server/ in dev.
+	const tries = [path.join(path.dirname(configPath()), name), path.resolve(name), path.resolve('..', name)];
+	for (const file of tries) {
+		try {
+			return fromToml(await readFile(file, 'utf8'));
+		} catch {
+			continue;
+		}
+	}
+	return null;
 }
 
 /** Backup first, then write through a temp file in the same directory so the swap is atomic. */
