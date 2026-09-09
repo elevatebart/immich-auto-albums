@@ -1,6 +1,6 @@
 import { json } from '@sveltejs/kit';
 import { fromToml, toToml } from '$core/config.js';
-import { readConfigFile, validateConfig, warningsFor, writeConfigFile } from '$lib/server/config-io';
+import { readConfigFile, readExampleConfig, validateConfig, warningsFor, writeConfigFile } from '$lib/server/config-io';
 import { PreviewError } from '$lib/server/preview';
 import type { ConfigWriteRequest } from '$lib/types';
 import type { RequestHandler } from './$types';
@@ -11,7 +11,8 @@ const fail = (e: unknown) =>
 export const GET: RequestHandler = async () => {
 	try {
 		const { file, text, etag, config } = await readConfigFile();
-		return json({ file, etag, config, toml: text });
+		const defaults = await readExampleConfig();
+		return json({ file, etag, config, toml: text, defaults });
 	} catch (e) {
 		return fail(e);
 	}

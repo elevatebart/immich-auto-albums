@@ -84,12 +84,17 @@ export interface ApplyResponse {
 	results: ApplyResult[];
 }
 
+/** What the config form highlights changes against. */
+export type Baseline = 'saved' | 'defaults';
+
 export interface ConfigResponse {
 	file: string;
 	/** Digest of the file on disk. PUT refuses a stale one. */
 	etag: string;
 	config: Config;
 	toml: string;
+	/** config.example.toml, the baseline the form can diff against. Absent when it does not ship. */
+	defaults?: Config | null;
 }
 
 export interface ConfigWriteRequest {

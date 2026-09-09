@@ -53,7 +53,9 @@ session token is ever sent to the browser or written to the config. `server/.env
 - `GET /api/geocode?q=` -> `{ hits: GeoHit[] }`: address to coordinates for the homes. Immich's own geodata first
   (`GET /search/places`, place level, nothing leaves the network), and only when that finds nothing, Nominatim for
   street level, which does send the query out. `GEOCODER=immich` turns that fallback off.
-- `GET /api/config` -> `ConfigResponse`: the parsed `Config`, the file text and an etag.
+- `GET /api/config` -> `ConfigResponse`: the parsed `Config`, the file text, an etag, and `defaults`: the parsed
+  `config.example.toml` when it is next to the config or in the working directory, else null. That is the second
+  baseline the form highlights against, so a deployment without the example simply loses that button.
 - `PUT /api/config` -> `ConfigWriteResponse`. Body: `{ etag, config, dryRun? }`. Replaces the file wholesale, so it
   takes the etag from GET and answers 409 when the file moved underneath. Every field is validated and all problems
   come back at once as `issues[{field, message}]` with 400, from the shared `validateConfig` in `src/validate.ts`. `dryRun` renders the TOML and the warnings without
@@ -65,6 +67,14 @@ session token is ever sent to the browser or written to the config. `server/.env
   tile picker with Immich thumbnails for "me" and the household, an address lookup that fills a home's coordinates,
   native date inputs for the fixed events, row editors for aliases and events, and the rendered TOML. Check file renders it through the dry run; Save
   writes it.
+  The form covers every key in the config (including the naming lists, the region share and the event absorb
+  share), so a change count can never point at a field the form does not show.
+  Every field also says how it differs from a baseline: the bar at the top counts the changes and switches between
+  the saved file and `config.example.toml`, each card header carries its own count, a changed control gets an amber
+  accent, a `changed`/`new` badge and a `was ...` value, and an entry the baseline has and the config does not is
+  listed struck through under its section. Rows with no room for a word (a home, an alias, an event) carry a
+  coloured dot with the same tooltip instead. `src/lib/change.ts` holds the wording and the colours, `$core/diff.js`
+  the comparison.
   Right (`AlbumsPanel.svelte`): the planned albums with create, update, rename, kept-name and unchanged badges, four
   thumbnails per row, the album name opening a full grid in a modal with the joining and leaving photos ringed, a
   kind filter and an unchanged-rows toggle. A trip or day trip modal also plots where its photos were taken.
@@ -88,8 +98,6 @@ explanatory comments from a template, so a UI write leaves the file as readable 
 Slider ranges and field hints are read from the JSON Schema through `schemaField`, so nothing about a bound is written
 twice. `src/schema.ts` deliberately has no Ajv import, which keeps the validator out of the browser bundle; the server
 imports `validateConfig` from `src/validate.ts` instead.
-
-Not here yet: the config form itself, the people picker, the Leaflet map.
 
 There is no auth in front of any of this, so bind it to the LAN. A signed in session carries the full rights of that
 Immich account, where `IMMICH_API_KEY` carries nine permissions, so sign out when you are done.

@@ -2,6 +2,7 @@
 	import { mdiDelete, mdiMapMarkerRadiusOutline, mdiPlus } from '@mdi/js';
 	import {
 		Alert,
+		Badge,
 		Button,
 		Card,
 		CardBody,
@@ -13,19 +14,24 @@
 		HelperText,
 		IconButton,
 		Input,
-		Label,
 		NumberInput,
-		Select,
 		Stack,
 		Text
 	} from '@immich/ui';
 	import { schemaField, type ConfigIssue } from '$core/schema.js';
+	import { countAt, kindAt, type ChangeKind, type ConfigDiff } from '$core/diff.js';
 	import type { Config, Zone } from '$core/types.js';
 	import AddressLookup from '$lib/components/AddressLookup.svelte';
+	import ChangeBadge from '$lib/components/ChangeBadge.svelte';
+	import ChangeFrame from '$lib/components/ChangeFrame.svelte';
+	import ChangeSummary from '$lib/components/ChangeSummary.svelte';
+	import GoneList from '$lib/components/GoneList.svelte';
 	import PeoplePicker from '$lib/components/PeoplePicker.svelte';
 	import Slider from '$lib/components/Slider.svelte';
+	import StringList from '$lib/components/StringList.svelte';
 	import ZoneModal from '$lib/components/ZoneModal.svelte';
-	import type { Person } from '$lib/types';
+	import { accent, detailAt } from '$lib/change';
+	import type { Baseline, Person } from '$lib/types';
 
 	interface Props {
 		config: Config;
@@ -35,6 +41,11 @@
 		people: Person[];
 		peopleNote: string;
 		toml: string;
+		/** What the config on screen changes about the baseline, keyed by field path. */
+		diff: ConfigDiff;
+		baseline: Baseline;
+		hasDefaults: boolean;
+		onbaseline: (next: Baseline) => void;
 	}
 
 	let {
@@ -43,7 +54,11 @@
 		issues,
 		people,
 		peopleNote,
-		toml
+		toml,
+		diff,
+		baseline,
+		hasDefaults,
+		onbaseline
 	}: Props = $props();
 
 	let showToml = $state(false);
@@ -51,6 +66,10 @@
 	const today = () => new Date().toISOString().slice(0, 10);
 	const iss = (field: string) => issues.find((i) => i.field === field)?.message;
 	const hint = (field: string) => schemaField(field).description;
+
+	/** Cards can hold a field from another section, so a count can exclude what another card shows. */
+	const count = (paths: string[], except: string[] = []) =>
+		countAt(diff, ...paths) - (except.length ? countAt(diff, ...except) : 0);
 
 	const sortHomes = () => config.homes.sort((a, b) => a.from.localeCompare(b.from));
 	const outOfOrder = $derived(config.homes.some((h, i, all) => i > 0 && h.from < all[i - 1].from));
@@ -74,6 +93,18 @@
 		}))
 	);
 	const shown = $derived(zoneGroups.find((g) => g.name === openZone));
+
+	/** A group is new only when every circle in it is, and changed when any circle moved. */
+	function groupChange(circles: Zone[]): { kind?: ChangeKind; detail: string } {
+		const paths = circles.map((c) => `zones[${config.zones.indexOf(c)}]`);
+		const kinds = paths.map((p) => kindAt(diff, p));
+		const kind = kinds.every((k) => k === 'added')
+			? 'added'
+			: kinds.some((k) => k)
+				? 'changed'
+				: undefined;
+		return { kind, detail: paths.map((p) => detailAt(diff, p)).filter(Boolean).join('; ') };
+	}
 
 	function addZone() {
 		const home = config.homes.at(-1);
@@ -118,36 +149,55 @@
 	}
 </script>
 
+{#snippet heading(text: string, paths: string[], except: string[] = [])}
+	{@const n = count(paths, except)}
+	<CardTitle>
+		<HStack gap={2} class="justify-between">
+			<span>{text}</span>
+			{#if n}<Badge color="warning" size="small">{n} changed</Badge>{/if}
+		</HStack>
+	</CardTitle>
+{/snippet}
+
 <Stack gap={4}>
+	<ChangeSummary {diff} {baseline} {hasDefaults} {onbaseline} />
+
 	<Card>
 		<CardHeader>
-			<CardTitle>Immich</CardTitle>
+			{@render heading('Immich', ['immich'])}
 			<CardDescription>
 				No credential is ever stored here: it comes from signing in, or from IMMICH_API_KEY.
 			</CardDescription>
 		</CardHeader>
 		<CardBody>
 			<Stack gap={4}>
-				<Field label="Server URL" invalid={!!iss('immich.url')}>
-					<Input bind:value={config.immich.url} placeholder="http://nas:2283" />
-					{#if iss('immich.url')}<HelperText color="danger">{iss('immich.url')}</HelperText>{/if}
-				</Field>
-				<Field label="Output directory" description={hint('immich.outDir')}>
-					<Input bind:value={config.immich.outDir} />
-				</Field>
-				<Field
-					label="Album marker"
-					description={hint('immich.marker')}
-					invalid={!!iss('immich.marker')}
-				>
-					<Input bind:value={config.immich.marker} />
-				</Field>
+				<ChangeFrame {diff} path="immich.url">
+					<Field label="Server URL" invalid={!!iss('immich.url')}>
+						<Input bind:value={config.immich.url} placeholder="http://nas:2283" />
+						{#if iss('immich.url')}<HelperText color="danger">{iss('immich.url')}</HelperText>{/if}
+					</Field>
+				</ChangeFrame>
+				<ChangeFrame {diff} path="immich.outDir">
+					<Field label="Output directory" description={hint('immich.outDir')}>
+						<Input bind:value={config.immich.outDir} />
+					</Field>
+				</ChangeFrame>
+				<ChangeFrame {diff} path="immich.marker">
+					<Field
+						label="Album marker"
+						description={hint('immich.marker')}
+						invalid={!!iss('immich.marker')}
+					>
+						<Input bind:value={config.immich.marker} />
+					</Field>
+				</ChangeFrame>
 				<Slider
 					label="Recompute window"
 					field="immich.windowDays"
 					bind:value={config.immich.windowDays}
 					unit="days"
 					{issues}
+					{diff}
 				/>
 			</Stack>
 		</CardBody>
@@ -155,82 +205,70 @@
 
 	<Card>
 		<CardHeader>
-			<CardTitle>People</CardTitle>
+			{@render heading('People', ['people'])}
 			<CardDescription>{peopleNote}</CardDescription>
 		</CardHeader>
 		<CardBody>
 			<Stack gap={4}>
-				<PeoplePicker
-					label="Me"
-					description={hint('people.me')}
-					{people}
-					selected={config.people.me ? [config.people.me] : []}
-					multiple={false}
-					onchange={(names) => (config.people.me = names[0] ?? '')}
-				/>
+				<ChangeFrame {diff} path="people.me">
+					<PeoplePicker
+						label="Me"
+						description={hint('people.me')}
+						{people}
+						selected={config.people.me ? [config.people.me] : []}
+						multiple={false}
+						onchange={(names) => (config.people.me = names[0] ?? '')}
+					/>
+				</ChangeFrame>
 				{#if iss('people.me')}<Text color="danger" size="small">{iss('people.me')}</Text>{/if}
-				<PeoplePicker
-					label="Household"
-					description={hint('people.household')}
-					{people}
-					selected={config.people.household}
-					onchange={(names) => (config.people.household = names)}
-				/>
+				<ChangeFrame {diff} path="people.household">
+					<PeoplePicker
+						label="Household"
+						description={hint('people.household')}
+						{people}
+						selected={config.people.household}
+						onchange={(names) => (config.people.household = names)}
+					/>
+					<GoneList {diff} path="people.household" />
+				</ChangeFrame>
 				<Slider
 					label="Guest share of tagged photos"
 					field="people.withShare"
 					bind:value={config.people.withShare}
 					step={0.05}
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Minimum tagged photos"
 					field="people.withMinTagged"
 					bind:value={config.people.withMinTagged}
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Maximum names in a title"
 					field="people.maxNamed"
 					bind:value={config.people.maxNamed}
 					{issues}
+					{diff}
 				/>
-				<div>
-					<Label label="Places that never get names" size="small" />
-					<Text color="muted" size="small" class="mb-2">{hint('people.noPeoplePlaces')}</Text>
-					<Stack gap={1}>
-						{#each config.people.noPeoplePlaces as _, i (i)}
-							<HStack gap={2}>
-								<Input bind:value={config.people.noPeoplePlaces[i]} />
-								<IconButton
-									icon={mdiDelete}
-									variant="ghost"
-									color="danger"
-									size="small"
-									aria-label="remove place"
-									onclick={() => config.people.noPeoplePlaces.splice(i, 1)}
-								/>
-							</HStack>
-						{/each}
-						<div>
-							<Button
-								variant="outline"
-								size="tiny"
-								leadingIcon={mdiPlus}
-								onclick={() => config.people.noPeoplePlaces.push('')}
-							>
-								Add place
-							</Button>
-						</div>
-					</Stack>
-				</div>
+				<StringList
+					label="Places that never get names"
+					description={hint('people.noPeoplePlaces')}
+					path="people.noPeoplePlaces"
+					bind:values={config.people.noPeoplePlaces}
+					{diff}
+					addLabel="Add place"
+					noun="place"
+				/>
 			</Stack>
 		</CardBody>
 	</Card>
 
 	<Card>
 		<CardHeader>
-			<CardTitle>Homes</CardTitle>
+			{@render heading('Homes', ['homes'])}
 			<CardDescription>
 				Each home applies until the next one starts, so they must stay in date order. Photos within
 				the home radius are home, everything else is a trip.
@@ -274,21 +312,25 @@
 									<NumberInput size="small" step={0.00001} bind:value={home.lon} />
 								</td>
 								<td class="py-1">
-									<IconButton
-										icon={mdiDelete}
-										variant="ghost"
-										color="danger"
-										size="small"
-										aria-label="remove home"
-										disabled={config.homes.length < 2}
-										onclick={() => config.homes.splice(i, 1)}
-									/>
+									<HStack gap={1}>
+										<ChangeBadge {diff} path={`homes[${i}]`} compact />
+										<IconButton
+											icon={mdiDelete}
+											variant="ghost"
+											color="danger"
+											size="small"
+											aria-label="remove home"
+											disabled={config.homes.length < 2}
+											onclick={() => config.homes.splice(i, 1)}
+										/>
+									</HStack>
 								</td>
 							</tr>
 						{/each}
 					</tbody>
 				</table>
 				</div>
+				<GoneList {diff} path="homes" />
 				<div>
 					<Button variant="outline" size="tiny" leadingIcon={mdiPlus} onclick={addHome}>
 						Add empty home
@@ -300,7 +342,7 @@
 
 	<Card>
 		<CardHeader>
-			<CardTitle>Zones</CardTitle>
+			{@render heading('Zones', ['zones', 'clustering.zoneShare'])}
 			<CardDescription>
 				A named area beats the district in an album name. Circles sharing a name are one zone, which
 				is how a mountain range can be covered without dragging in the valley between its resorts.
@@ -312,9 +354,16 @@
 					<Text color="muted" size="small">No zones. Trips fall back to the district or the region.</Text>
 				{/if}
 				{#each zoneGroups as group (group.name)}
-					<HStack gap={2} class="border-subtle flex-wrap justify-between border-b pb-2">
+					{@const change = groupChange(group.circles)}
+					<HStack
+						gap={2}
+						class="border-subtle flex-wrap justify-between border-b pb-2 {accent(change.kind)}"
+					>
 						<Stack gap={0}>
-							<Text size="small">{group.name}</Text>
+							<HStack gap={2}>
+								<Text size="small">{group.name}</Text>
+								<ChangeBadge kind={change.kind} detail={change.detail} />
+							</HStack>
 							<Text color="muted" size="tiny">
 								{group.circles.length} circle{group.circles.length === 1 ? '' : 's'}, {group.circles
 									.map((z) => `${z.km} km`)
@@ -341,6 +390,7 @@
 						</HStack>
 					</HStack>
 				{/each}
+				<GoneList {diff} path="zones" />
 				<div>
 					<Button variant="outline" size="tiny" leadingIcon={mdiPlus} onclick={addZone}>Add zone</Button>
 				</div>
@@ -349,6 +399,7 @@
 					field="clustering.zoneShare"
 					bind:value={config.clustering.zoneShare}
 					{issues}
+					{diff}
 				/>
 			</Stack>
 		</CardBody>
@@ -356,7 +407,10 @@
 
 	<Card>
 		<CardHeader>
-			<CardTitle>Clustering</CardTitle>
+			{@render heading('Clustering', ['clustering'], [
+				'clustering.zoneShare',
+				'clustering.eventAbsorbShare'
+			])}
 			<CardDescription>
 				What counts as a trip, a day trip or a gathering. Check the preview after moving these.
 			</CardDescription>
@@ -370,6 +424,7 @@
 					step={0.5}
 					unit="km"
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Place radius"
@@ -378,6 +433,7 @@
 					step={0.5}
 					unit="km"
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Place radius cap"
@@ -394,6 +450,7 @@
 					step={0.5}
 					unit="km"
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Dominant place share"
@@ -401,6 +458,15 @@
 					bind:value={config.clustering.dominantShare}
 					step={0.05}
 					{issues}
+					{diff}
+				/>
+				<Slider
+					label="Region share"
+					field="clustering.regionShare"
+					bind:value={config.clustering.regionShare}
+					step={0.05}
+					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Trip gap"
@@ -408,24 +474,28 @@
 					bind:value={config.clustering.tripGapHours}
 					unit="hours"
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Trip minimum photos"
 					field="clustering.tripMinPhotos"
 					bind:value={config.clustering.tripMinPhotos}
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Trip minimum days"
 					field="clustering.tripMinDays"
 					bind:value={config.clustering.tripMinDays}
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Day trip minimum photos"
 					field="clustering.daytripMinPhotos"
 					bind:value={config.clustering.daytripMinPhotos}
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Gathering gap"
@@ -434,18 +504,21 @@
 					step={0.5}
 					unit="hours"
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Gathering minimum photos"
 					field="clustering.gatherMinPhotos"
 					bind:value={config.clustering.gatherMinPhotos}
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Gathering minimum guests"
 					field="clustering.gatherMinGuests"
 					bind:value={config.clustering.gatherMinGuests}
 					{issues}
+					{diff}
 				/>
 			</Stack>
 		</CardBody>
@@ -453,7 +526,7 @@
 
 	<Card>
 		<CardHeader>
-			<CardTitle>Person years and seasons</CardTitle>
+			{@render heading('Person years and seasons', ['personYears', 'seasons'])}
 		</CardHeader>
 		<CardBody>
 			<Stack gap={2}>
@@ -462,25 +535,30 @@
 					field="personYears.minPhotos"
 					bind:value={config.personYears.minPhotos}
 					{issues}
+					{diff}
 				/>
 				<Slider
 					label="Household minimum photos"
 					field="personYears.householdMinPhotos"
 					bind:value={config.personYears.householdMinPhotos}
 					{issues}
+					{diff}
 				/>
-				<Field
-					label="GPS-less era ends"
-					description={hint('seasons.noGpsEraEnd')}
-					invalid={!!iss('seasons.noGpsEraEnd')}
-				>
-					<Input type="date" bind:value={config.seasons.noGpsEraEnd} />
-				</Field>
+				<ChangeFrame {diff} path="seasons.noGpsEraEnd">
+					<Field
+						label="GPS-less era ends"
+						description={hint('seasons.noGpsEraEnd')}
+						invalid={!!iss('seasons.noGpsEraEnd')}
+					>
+						<Input type="date" bind:value={config.seasons.noGpsEraEnd} />
+					</Field>
+				</ChangeFrame>
 				<Slider
 					label="Season minimum photos"
 					field="seasons.minPhotos"
 					bind:value={config.seasons.minPhotos}
 					{issues}
+					{diff}
 				/>
 			</Stack>
 		</CardBody>
@@ -488,7 +566,41 @@
 
 	<Card>
 		<CardHeader>
-			<CardTitle>Place aliases</CardTitle>
+			{@render heading('Naming', ['naming'])}
+			<CardDescription>
+				Countries named after their district (a French departement) instead of their region, and the
+				regions that keep naming albums anyway.
+			</CardDescription>
+		</CardHeader>
+		<CardBody>
+			<Stack gap={4}>
+				<StringList
+					label="District countries"
+					description={hint('naming.districtCountries')}
+					path="naming.districtCountries"
+					bind:values={config.naming.districtCountries}
+					{diff}
+					addLabel="Add country"
+					placeholder="France"
+					noun="country"
+				/>
+				<StringList
+					label="Regions that keep their name"
+					description={hint('naming.keepRegions')}
+					path="naming.keepRegions"
+					bind:values={config.naming.keepRegions}
+					{diff}
+					addLabel="Add region"
+					placeholder="Normandy"
+					noun="region"
+				/>
+			</Stack>
+		</CardBody>
+	</Card>
+
+	<Card>
+		<CardHeader>
+			{@render heading('Place aliases', ['aliases'])}
 			<CardDescription>
 				Geocoder label on the left, the name used in albums on the right.
 			</CardDescription>
@@ -500,6 +612,9 @@
 						<Input size="small" bind:value={row.from} placeholder="City of Westminster" />
 						<Text color="muted">to</Text>
 						<Input size="small" bind:value={row.to} placeholder="London" />
+						{#if row.from.trim()}
+							<ChangeBadge {diff} path={`aliases.${row.from.trim()}`} compact />
+						{/if}
 						<IconButton
 							icon={mdiDelete}
 							variant="ghost"
@@ -510,6 +625,7 @@
 						/>
 					</HStack>
 				{/each}
+				<GoneList {diff} path="aliases" keyed />
 				<div>
 					<Button
 						variant="outline"
@@ -526,7 +642,7 @@
 
 	<Card>
 		<CardHeader>
-			<CardTitle>Fixed events</CardTitle>
+			{@render heading('Fixed events', ['events', 'clustering.eventAbsorbShare'])}
 			<CardDescription>
 				Every photo in the inclusive range, GPS or not, goes in the album.
 			</CardDescription>
@@ -538,6 +654,7 @@
 						<Input size="small" bind:value={event.name} placeholder="Our wedding" />
 						<Input type="date" size="small" bind:value={event.from} />
 						<Input type="date" size="small" bind:value={event.to} />
+						<ChangeBadge {diff} path={`events[${i}]`} compact />
 						<IconButton
 							icon={mdiDelete}
 							variant="ghost"
@@ -551,6 +668,7 @@
 						<Text color="danger" size="small">{iss(`events[${i}].to`)}</Text>
 					{/if}
 				{/each}
+				<GoneList {diff} path="events" />
 				<div>
 					<Button
 						variant="outline"
@@ -561,6 +679,14 @@
 						Add event
 					</Button>
 				</div>
+				<Slider
+					label="Event absorb share"
+					field="clustering.eventAbsorbShare"
+					bind:value={config.clustering.eventAbsorbShare}
+					step={0.05}
+					{issues}
+					{diff}
+				/>
 			</Stack>
 		</CardBody>
 	</Card>
@@ -597,4 +723,3 @@
 		onClose={() => (openZone = null)}
 	/>
 {/if}
-
