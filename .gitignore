@@ -15,6 +15,9 @@ server/build/
 
 __pycache__/
 
+# Image archives built for the NAS import.
+*.tar
+
 run_*.log
 decisions_*.csv
 plan_*.json

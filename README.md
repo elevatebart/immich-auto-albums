@@ -77,8 +77,11 @@ Build on a Mac instead and import the result, which needs `--platform linux/amd6
       -t immich-auto-albums:cli --output type=docker,dest=cli.tar .
 
 Copy `cli.tar` to a share and take it in through Container Manager, Image, Add From File. The tag rides inside
-the archive, so nothing needs retagging. `--output type=docker` is what makes it importable: with Docker
-Desktop's containerd image store, plain `docker save` writes an OCI archive that DSM's older engine rejects.
+the archive, so nothing needs retagging. `--output type=docker` writes an OCI layout with a root `manifest.json`
+alongside it, which is the part `docker load` reads. Should Container Manager still refuse the file, convert it
+to a plain docker-archive and import that:
+
+    skopeo copy oci-archive:cli.tar docker-archive:cli-legacy.tar:immich-auto-albums:cli
 
 `/data` is the only mount: it holds `config.toml` and receives `run_*.log`, `decisions_*.csv` and `plan_*.json`.
 The container runs as root so it can write to a NAS share.
