@@ -64,8 +64,7 @@ the `cli` target. The UI is not in it. It is a local tool for writing `config.to
 
     docker pull ghcr.io/elevatebart/immich-auto-albums:latest
 
-The package has to be public in the repo's package settings, or the NAS needs a `docker login ghcr.io` with a
-`read:packages` token first.
+The package is public, so the pull needs no credential on the NAS.
 
 Building it yourself is still one command each, and the default target adds the UI:
 
@@ -103,6 +102,12 @@ with it.
            -v /volume1/tools/immich-auto-albums:/data \
            ghcr.io/elevatebart/immich-auto-albums:latest apply --all
 
+The full path to `docker` is not decoration. Task Scheduler runs the script without a login shell, so `PATH` is
+`/usr/bin:/bin:/usr/sbin:/sbin` and `/usr/local/bin`, where the Docker package symlinks its binary, is missing.
+A bare `docker` works over SSH and fails on the schedule. `export PATH=/usr/local/bin:$PATH` at the top of the
+script is the other way round. Check the path with `which docker` first: Container Manager on DSM 7.2 is a
+different package and the symlink is not guaranteed.
+
 The pull is the whole update mechanism: every run starts on the newest release, and there is no image to carry
 over by hand any more. `&&` means a registry outage skips the run instead of quietly applying an old planner;
 swap it for `;` if you would rather run stale than not run. Pin `:latest` to `:1.2.0` to put a human between a
@@ -116,8 +121,31 @@ task's email notification to get the run log.
 safe, just narrower.
 
 `/data` is the only mount, and the image already sets `CONFIG=/data/config.toml` and `OUT=/data`. A config under
-another name needs `-e CONFIG=/data/<name>.toml`, and `IMMICH_URL` only when it differs from `immich.url` in the
-config. There is no `DRY_RUN`: `preview` writes nothing, `apply` writes, and that is the whole switch.
+another name needs `-e CONFIG=/data/<name>.toml` on the `run`, before the image:
+
+    /usr/local/bin/docker run --rm --network host \
+      -e CONFIG=/data/bart.toml \
+      -v /volume1/tools/immich-auto-albums:/data \
+      ghcr.io/elevatebart/immich-auto-albums:latest apply --all
+
+There is no `--config` flag, the environment variable is the only way in. The key is read from `/data/.env`
+whatever the config is called.
+
+Two tasks for two Immich accounts, sharing one `/data`, get a key each through docker's own `--env-file`:
+
+    /usr/local/bin/docker run --rm --network host \
+      --env-file /volume1/tools/immich-auto-albums/bart.env \
+      -e CONFIG=/data/bart.toml \
+      -v /volume1/tools/immich-auto-albums:/data \
+      ghcr.io/elevatebart/immich-auto-albums:latest apply --all
+
+The environment wins over the file, so this beats `/data/.env`, and the key stays out of the task definition
+either way. Delete `/data/.env` once you split, or a task that lost its `--env-file` silently applies one
+person's plan to the other's library instead of stopping. A key is scoped to one Immich account and albums are
+created as that account's user, so two people means two keys from two accounts, not one admin key doing both.
+
+`IMMICH_URL` is needed only when it differs from `immich.url` in the config. There is no `DRY_RUN`: `preview`
+writes nothing, `apply` writes, and that is the whole switch.
 
 ## Releasing
 
