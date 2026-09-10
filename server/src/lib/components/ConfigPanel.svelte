@@ -66,6 +66,9 @@
 	const today = () => new Date().toISOString().slice(0, 10);
 	const iss = (field: string) => issues.find((i) => i.field === field)?.message;
 	const hint = (field: string) => schemaField(field).description;
+	/** Coordinates take their bounds from the schema, and five decimals, about a metre. */
+	const homeLat = schemaField('homes.lat');
+	const homeLon = schemaField('homes.lon');
 
 	/** Cards can hold a field from another section, so a count can exclude what another card shows. */
 	const count = (paths: string[], except: string[] = []) =>
@@ -305,10 +308,22 @@
 									<Input type="date" size="small" bind:value={home.from} />
 								</td>
 								<td class="py-1 pe-2">
-									<NumberInput size="small" step={0.00001} bind:value={home.lat} />
+									<NumberInput
+										size="small"
+										step={0.00001}
+										min={homeLat.minimum}
+										max={homeLat.maximum}
+										bind:value={home.lat}
+									/>
 								</td>
 								<td class="py-1 pe-2">
-									<NumberInput size="small" step={0.00001} bind:value={home.lon} />
+									<NumberInput
+										size="small"
+										step={0.00001}
+										min={homeLon.minimum}
+										max={homeLon.maximum}
+										bind:value={home.lon}
+									/>
 								</td>
 								<td class="py-1">
 									<HStack gap={1}>
