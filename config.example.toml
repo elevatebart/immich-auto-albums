@@ -78,6 +78,7 @@ keep_regions = ["Normandy", "Île-de-France"]
 "Île-de-France" = "Paris"
 "Loire-et-Cher" = "Loir-et-Cher"   # the geodata spells it wrong
 "City of Westminster" = "London"
+"United States of America" = "USA"   # the geodata's country name is too long for a title
 "Manhattan" = "New York City"
 
 # Hand-declared events: every photo in the inclusive range, GPS or not.

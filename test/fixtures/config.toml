@@ -96,6 +96,7 @@ keep_regions = ["Normandy", "Île-de-France"]
 [aliases]
 "Île-de-France" = "Paris"
 "City of Westminster" = "London"
+"United States of America" = "USA"   # the geodata's country name is too long for a title
 "Manhattan" = "New York City"
 "Ipanema" = "Rio de Janeiro"
 "Lincolnwood" = "Chicago"
