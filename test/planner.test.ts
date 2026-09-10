@@ -44,7 +44,7 @@ describe("rule engines", () => {
     expect(names.some((n) => n.startsWith("person|Nadia 2026"))).toBe(false); // 5 < household min 10
   });
 
-  it("place hierarchy: village merge, state, country, two countries, no-people places", () => {
+  it("place hierarchy: village merge, state, two states, two countries, no-people places", () => {
     const ctx = makeContext(cfg, NOW, 9000);
     const trip = (off: number, spots: [number, number, string, string, string, number, string[]][]) => {
       const b = new Date(Date.UTC(2025, 0, 1 + off));
@@ -63,7 +63,9 @@ describe("rule engines", () => {
       "Versoix, Jan 2025",
       "Saint-Thomas-en-Royans, Jan-Feb 2025",
       "Illinois, Mar 2025",
-      "USA, Apr 2025",
+      // Two states of one country: both are named, since "USA" says nothing about where.
+      "Texas & Florida, Apr 2025",
+      // Two countries: the pair stays at country level rather than naming their regions.
       "France & UK, May 2025",
     ]);
   });
@@ -82,7 +84,8 @@ describe("rule engines", () => {
     const tight = spots(30, [[35.69, 139.7, "Tokyo", "Kanto", 10], [35.63, 139.88, "Chiba", "Kanto", 8]]);
     expect(planTrips(ctx, [...wide, ...tight]).map((p) => p.name)).toEqual(["Tokyo, Jan 2025", "Kanto, Jan-Feb 2025"]);
     const off = { ...cfg, clustering: { ...cfg.clustering, placeKmMax: cfg.clustering.placeKm } };
-    expect(planTrips(makeContext(off, NOW, 9000), wide).map((p) => p.name)).toEqual(["Japan, Jan 2025"]);
+    // No place dominates without the merge, so the two regions name it instead of the country.
+    expect(planTrips(makeContext(off, NOW, 9000), wide).map((p) => p.name)).toEqual(["Kanto & Kansai, Jan 2025"]);
   });
 
   it("a French departement names the trip, unless the region is one to keep", () => {

@@ -123,6 +123,8 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   small circles: one wide circle around Grenoble also holds the valley, and named a day in Bilieu a mountain trip.
 - The area is the region, except in `naming.district_countries` (France), where the district wins unless the region
   is in `naming.keep_regions`: one district holding the share, else its top two joined by " & ", else the region.
+- The region is one region holding `region_share`, else the top two joined by " & " when a single country holds that
+  share too, so a two state trip reads "Texas & Florida" and a border trip still reads "France & Spain".
   Immich exif has no district, so `attachDistricts` fills `Asset.district` from `GET /search/places?name=<city>`,
   one lookup per distinct city, picking the exact-name hit nearest the photo and dropping anything over 100 km.
   The index skips the smallest communes, so a town it does not carry takes the district of the nearest town

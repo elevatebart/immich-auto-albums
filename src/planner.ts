@@ -153,13 +153,24 @@ function districtName(cfg: Config, gps: Asset[], need: number): string | null {
   return null;
 }
 
+/** One region holding `need` photos, else the top two of a single country, so "Utah & Arizona". */
+function regionName(cfg: Config, gps: Asset[], need: number): string | null {
+  const top = [...counted(gps.map((a) => normPlace(cfg, a.state)))].sort((x, y) => y[1] - x[1]);
+  if (!top.length) return null;
+  if (top[0][1] >= need) return top[0][0];
+  // A pair only reads as a place inside one country, or a border trip loses "France & Spain".
+  const country = commonest(gps.map((a) => a.country));
+  if (!country || country[1] < need || top.length < 2) return null;
+  return top[0][1] + top[1][1] >= need ? top.slice(0, 2).map(([r]) => r).join(" & ") : null;
+}
+
 /** Above city level: the district when the country prefers it, else the region. */
 function areaName(cfg: Config, gps: Asset[], share: number): string | null {
   const need = share * gps.length;
   const region = commonest(gps.map((a) => a.state));
-  const enough = !!region && region[1] >= need;
-  if (enough && !prefersDistricts(cfg, gps, region[0])) return normPlace(cfg, region[0]);
-  return districtName(cfg, gps, need) ?? (enough ? normPlace(cfg, region[0]) : null);
+  const name = regionName(cfg, gps, need);
+  if (name && !(region && prefersDistricts(cfg, gps, region[0]))) return name;
+  return districtName(cfg, gps, need) ?? name;
 }
 
 /** City if one place dominates, else district or region, else country, else two countries. */
