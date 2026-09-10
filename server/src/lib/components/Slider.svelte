@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Label, NumberInput, Text } from '@immich/ui';
-	import { schemaField, type ConfigIssue } from '$core/schema.js';
+	import { schemaField, schemaStep, type ConfigIssue } from '$core/schema.js';
 	import { EMPTY_DIFF, type ConfigDiff } from '$core/diff.js';
 	import { accent, valueText } from '$lib/change';
 	import ChangeBadge from '$lib/components/ChangeBadge.svelte';
@@ -10,7 +10,6 @@
 		/** Dotted path into Config. The range, the hint, the issue and the change all key off it. */
 		field: string;
 		value: number;
-		step?: number;
 		unit?: string;
 		issues?: ConfigIssue[];
 		diff?: ConfigDiff;
@@ -20,13 +19,13 @@
 		label,
 		field,
 		value = $bindable(),
-		step = 1,
 		unit,
 		issues = [],
 		diff = EMPTY_DIFF
 	}: Props = $props();
 
 	const meta = $derived(schemaField(field));
+	const gap = $derived(schemaStep(field));
 	const issue = $derived(issues.find((i) => i.field === field)?.message);
 	const change = $derived(diff.changes[field]);
 	const id = $props.id();
@@ -44,7 +43,7 @@
 				size="small"
 				min={meta.minimum}
 				max={meta.maximum}
-				{step}
+				step={gap}
 				aria-label={label}
 			/>
 			{#if unit}<Text color="muted" size="tiny" class="whitespace-nowrap">{unit}</Text>{/if}
@@ -55,7 +54,7 @@
 		type="range"
 		min={meta.minimum}
 		max={meta.maximum}
-		{step}
+		step={gap}
 		bind:value
 		class="accent-primary h-5 w-full"
 		aria-label={label}

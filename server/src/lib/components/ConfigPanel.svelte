@@ -66,6 +66,9 @@
 	const today = () => new Date().toISOString().slice(0, 10);
 	const iss = (field: string) => issues.find((i) => i.field === field)?.message;
 	const hint = (field: string) => schemaField(field).description;
+	/** Coordinates take their bounds from the schema, and five decimals, about a metre. */
+	const homeLat = schemaField('homes.lat');
+	const homeLon = schemaField('homes.lon');
 
 	/** Cards can hold a field from another section, so a count can exclude what another card shows. */
 	const count = (paths: string[], except: string[] = []) =>
@@ -235,7 +238,6 @@
 					label="Guest share of tagged photos"
 					field="people.withShare"
 					bind:value={config.people.withShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
@@ -306,10 +308,22 @@
 									<Input type="date" size="small" bind:value={home.from} />
 								</td>
 								<td class="py-1 pe-2">
-									<NumberInput size="small" step={0.00001} bind:value={home.lat} />
+									<NumberInput
+										size="small"
+										step={0.00001}
+										min={homeLat.minimum}
+										max={homeLat.maximum}
+										bind:value={home.lat}
+									/>
 								</td>
 								<td class="py-1 pe-2">
-									<NumberInput size="small" step={0.00001} bind:value={home.lon} />
+									<NumberInput
+										size="small"
+										step={0.00001}
+										min={homeLon.minimum}
+										max={homeLon.maximum}
+										bind:value={home.lon}
+									/>
 								</td>
 								<td class="py-1">
 									<HStack gap={1}>
@@ -421,7 +435,6 @@
 					label="Home radius"
 					field="clustering.homeKm"
 					bind:value={config.clustering.homeKm}
-					step={0.5}
 					unit="km"
 					{issues}
 					{diff}
@@ -430,7 +443,6 @@
 					label="Place radius"
 					field="clustering.placeKm"
 					bind:value={config.clustering.placeKm}
-					step={0.5}
 					unit="km"
 					{issues}
 					{diff}
@@ -439,7 +451,6 @@
 					label="Place radius cap"
 					field="clustering.placeKmMax"
 					bind:value={config.clustering.placeKmMax}
-					step={0.5}
 					unit="km"
 					{issues}
 				/>
@@ -447,7 +458,6 @@
 					label="Label merge radius"
 					field="clustering.mergeLabelKm"
 					bind:value={config.clustering.mergeLabelKm}
-					step={0.5}
 					unit="km"
 					{issues}
 					{diff}
@@ -456,7 +466,6 @@
 					label="Dominant place share"
 					field="clustering.dominantShare"
 					bind:value={config.clustering.dominantShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
@@ -464,7 +473,6 @@
 					label="Region share"
 					field="clustering.regionShare"
 					bind:value={config.clustering.regionShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
@@ -472,7 +480,6 @@
 					label="Leading place share"
 					field="clustering.leadShare"
 					bind:value={config.clustering.leadShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
@@ -509,7 +516,6 @@
 					label="Gathering gap"
 					field="clustering.gatherGapHours"
 					bind:value={config.clustering.gatherGapHours}
-					step={0.5}
 					unit="hours"
 					{issues}
 					{diff}
@@ -701,7 +707,6 @@
 					label="Event absorb share"
 					field="clustering.eventAbsorbShare"
 					bind:value={config.clustering.eventAbsorbShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
