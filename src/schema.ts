@@ -54,6 +54,10 @@ export const configSchema = {
       mergeLabelKm: num(0.1, 500, "Merges nearby place groups before picking the album name."),
       dominantShare: num(0, 1, "Share of a trip's GPS photos one place needs to name the album."),
       regionShare: { ...num(0, 1, "Share one region needs before the other regions are ignored in the name."), default: 0.8 },
+      leadShare: {
+        ...num(0, 1, "Share the leading place needs to name a trip no region carries, when it doubles the runner-up."),
+        default: 0.35,
+      },
       zoneShare: { ...num(0, 1, "Share of a trip's GPS photos a named zone needs to name the album."), default: 0.6 },
       tripGapHours: num(1, 8760, "A gap longer than this starts a new trip."),
       tripMinPhotos: int(1, 1000, "Minimum photos for a trip."),

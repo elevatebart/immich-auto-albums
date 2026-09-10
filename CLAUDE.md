@@ -118,7 +118,10 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   over 3 is the target, `place_km_max` the cap. Set the cap to `place_km` to switch it off. `merge_label_km`
   stays fixed, so on a spread out trip the place radius, not the merge, is what joins two destinations.
 - Trip naming, in order: a place holding `dominant_share` of the GPS photos, else a `[[zones]]` area holding
-  `zone_share` of them, else the area (see below), else the one country, else the top two joined by " & ".
+  `zone_share` of them, else the area (see below), else the leading place when it holds `lead_share` and doubles
+  the runner-up, else the one country, else the top two joined by " & ".
+- `lead_share` only ever replaces a country name: a road trip whose photos sit mostly in New Orleans but cross four
+  states reads "New Orleans", while a trip spread evenly over its stops still reads at country level.
   Zones sharing a name are one area, tested as a union and tightest first, because a mountain range is several
   small circles: one wide circle around Grenoble also holds the valley, and named a day in Bilieu a mountain trip.
 - The area is the region, except in `naming.district_countries` (France), where the district wins unless the region

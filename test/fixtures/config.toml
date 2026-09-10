@@ -53,6 +53,7 @@ place_km_max = 25
 merge_label_km = 15
 dominant_share = 0.75
 region_share = 0.8
+lead_share = 0.35
 zone_share = 0.6
 trip_gap_hours = 72
 trip_min_photos = 10

@@ -60,6 +60,8 @@ describe("rule engines", () => {
       // Three states, so no pair carries the trip: the country names it, through its alias.
       ...trip(120, [[29.76, -95.37, "Houston", "Texas", "United States of America", 6, []], [27.77, -82.64, "St. Petersburg", "Florida", "United States of America", 5, []], [34.05, -118.24, "Los Angeles", "California", "United States of America", 5, []]]),
       ...trip(150, [[48.85, 2.35, "Paris 09 Opéra", "IdF", "France", 8, []], [51.5, -0.12, "City of Westminster", "England", "UK", 7, []]]),
+      // A road trip through four states: no region carries it, so the leading city names it.
+      ...trip(180, [[29.95, -90.07, "New Orleans", "Louisiana", "United States of America", 13, []], [37.46, -89.24, "Anna", "Illinois", "United States of America", 5, []], [43.47, -89.74, "Baraboo", "Wisconsin", "United States of America", 4, []], [35.15, -90.05, "Memphis", "Tennessee", "United States of America", 3, []]]),
     ];
     expect(planTrips(ctx, A).map((p) => p.name)).toEqual([
       "Versoix, Jan 2025",
@@ -70,6 +72,7 @@ describe("rule engines", () => {
       "USA, May 2025",
       // Two countries: the pair stays at country level rather than naming their regions.
       "France & UK, May-Jun 2025",
+      "New Orleans, Jun-Jul 2025",
     ]);
   });
 

@@ -34,6 +34,7 @@ place_km_max = 25         # that radius grows with how spread out the trip is, u
 merge_label_km = 15       # merges nearby groups before picking the album name
 dominant_share = 0.75     # share of a trip's GPS photos one place needs to name the album
 region_share = 0.8        # share one region needs before the other regions are ignored in the name
+lead_share = 0.35         # share the leading place needs to name a trip no region carries, at twice the runner-up
 zone_share = 0.6          # share a named zone needs to name the album, ahead of the district
 trip_gap_hours = 72       # a longer gap starts a new trip
 trip_min_photos = 10

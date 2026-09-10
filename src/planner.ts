@@ -173,7 +173,15 @@ function areaName(cfg: Config, gps: Asset[], share: number): string | null {
   return districtName(cfg, gps, need) ?? name;
 }
 
-/** City if one place dominates, else district or region, else country, else two countries. */
+/** The leading place names the trip when it doubles the runner-up, so a road trip is not a country. */
+function leadName(cfg: Config, places: Group[], gps: Asset[]): string | null {
+  const [first, second] = places;
+  if (!first || first.items.length < cfg.clustering.leadShare * gps.length) return null;
+  if (second && first.items.length < 2 * second.items.length) return null;
+  return label(cfg, first.items) ?? areaName(cfg, first.items, 0);
+}
+
+/** City if one place dominates, else district or region, else the leading city, else country. */
 export function placeName(cfg: Config, cluster: Asset[]): string {
   const gps = cluster.filter(hasGps);
   const places: Group[] = [];
@@ -191,6 +199,8 @@ export function placeName(cfg: Config, cluster: Asset[]): string {
   // One area holding most of the photos names the trip on its own; the rest is a detour.
   const area = zoneName(cfg, gps) ?? areaName(cfg, gps, cfg.clustering.regionShare);
   if (area) return area;
+  const lead = leadName(cfg, places, gps);
+  if (lead) return lead;
   const countries = counted(gps.map((a) => normPlace(cfg, a.country)));
   if (countries.size === 1) return [...countries.keys()][0];
   const top2 = [...countries.entries()].sort((x, y) => y[1] - x[1]).slice(0, 2).map(([c]) => c);
