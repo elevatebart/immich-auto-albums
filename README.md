@@ -128,9 +128,24 @@ another name needs `-e CONFIG=/data/<name>.toml` on the `run`, before the image:
       -v /volume1/tools/immich-auto-albums:/data \
       ghcr.io/elevatebart/immich-auto-albums:latest apply --all
 
-There is no `--config` flag, the environment variable is the only way in. The key stays at `/data/.env` whatever
-the config is called. `IMMICH_URL` is needed only when it differs from `immich.url` in the config. There is no
-`DRY_RUN`: `preview` writes nothing, `apply` writes, and that is the whole switch.
+There is no `--config` flag, the environment variable is the only way in. The key is read from `/data/.env`
+whatever the config is called.
+
+Two tasks for two Immich accounts, sharing one `/data`, get a key each through docker's own `--env-file`:
+
+    /usr/local/bin/docker run --rm --network host \
+      --env-file /volume1/tools/immich-auto-albums/bart.env \
+      -e CONFIG=/data/bart.toml \
+      -v /volume1/tools/immich-auto-albums:/data \
+      ghcr.io/elevatebart/immich-auto-albums:latest apply --all
+
+The environment wins over the file, so this beats `/data/.env`, and the key stays out of the task definition
+either way. Delete `/data/.env` once you split, or a task that lost its `--env-file` silently applies one
+person's plan to the other's library instead of stopping. A key is scoped to one Immich account and albums are
+created as that account's user, so two people means two keys from two accounts, not one admin key doing both.
+
+`IMMICH_URL` is needed only when it differs from `immich.url` in the config. There is no `DRY_RUN`: `preview`
+writes nothing, `apply` writes, and that is the whole switch.
 
 ## Releasing
 
