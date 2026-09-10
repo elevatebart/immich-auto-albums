@@ -10,6 +10,7 @@
 		/** Dotted path into Config. The range, the hint, the issue and the change all key off it. */
 		field: string;
 		value: number;
+		/** Defaults to 0.05 on a 0..1 field, else 1, so a share slider does not snap to full. */
 		step?: number;
 		unit?: string;
 		issues?: ConfigIssue[];
@@ -20,13 +21,14 @@
 		label,
 		field,
 		value = $bindable(),
-		step = 1,
+		step,
 		unit,
 		issues = [],
 		diff = EMPTY_DIFF
 	}: Props = $props();
 
 	const meta = $derived(schemaField(field));
+	const gap = $derived(step ?? ((meta.maximum ?? 1) <= 1 ? 0.05 : 1));
 	const issue = $derived(issues.find((i) => i.field === field)?.message);
 	const change = $derived(diff.changes[field]);
 	const id = $props.id();
@@ -44,7 +46,7 @@
 				size="small"
 				min={meta.minimum}
 				max={meta.maximum}
-				{step}
+				step={gap}
 				aria-label={label}
 			/>
 			{#if unit}<Text color="muted" size="tiny" class="whitespace-nowrap">{unit}</Text>{/if}
@@ -55,7 +57,7 @@
 		type="range"
 		min={meta.minimum}
 		max={meta.maximum}
-		{step}
+		step={gap}
 		bind:value
 		class="accent-primary h-5 w-full"
 		aria-label={label}
