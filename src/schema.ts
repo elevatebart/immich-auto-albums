@@ -131,11 +131,21 @@ export interface ConfigIssue {
 }
 
 /** Schema node for a dotted path, so a form can read ranges and descriptions from one place. */
-export function schemaField(path: string): { minimum?: number; maximum?: number; description?: string; enum?: string[] } {
+export function schemaField(path: string): { type?: string; minimum?: number; maximum?: number; description?: string; enum?: string[] } {
   let node: any = configSchema;
   for (const seg of path.split(".")) {
     node = node?.properties?.[seg] ?? node?.items?.properties?.[seg];
     if (!node) return {};
   }
   return node;
+}
+
+/** Slider granularity implied by the range: whole numbers by 1, a share by 0.05, a fractional
+    minimum by itself, so the round values stay on a grid that starts at the minimum. */
+export function schemaStep(path: string): number {
+  const f = schemaField(path);
+  if (f.type === "integer") return 1;
+  const min = f.minimum ?? 0;
+  if ((f.maximum ?? 1) <= 1) return 0.05;
+  return min > 0 && min < 1 ? min : 1;
 }

@@ -16,6 +16,7 @@
 		Text
 	} from '@immich/ui';
 	import type { Zone } from '$core/types.js';
+	import { schemaField, schemaStep } from '$core/schema.js';
 	import { createMap, whenSized } from '$lib/leaflet';
 	import type { Town } from '$lib/types';
 	import 'leaflet/dist/leaflet.css';
@@ -173,7 +174,12 @@
 									<NumberInput size="small" step={0.00001} bind:value={circle.lon} />
 								</td>
 								<td class="py-1 pe-2">
-									<NumberInput size="small" step={0.5} min={0.1} bind:value={circle.km} />
+									<NumberInput
+										size="small"
+										step={schemaStep('zones.km')}
+										min={schemaField('zones.km').minimum}
+										bind:value={circle.km}
+									/>
 								</td>
 								<td class="py-1">
 									<IconButton

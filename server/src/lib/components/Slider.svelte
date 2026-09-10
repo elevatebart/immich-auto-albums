@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { Label, NumberInput, Text } from '@immich/ui';
-	import { schemaField, type ConfigIssue } from '$core/schema.js';
+	import { schemaField, schemaStep, type ConfigIssue } from '$core/schema.js';
 	import { EMPTY_DIFF, type ConfigDiff } from '$core/diff.js';
 	import { accent, valueText } from '$lib/change';
 	import ChangeBadge from '$lib/components/ChangeBadge.svelte';
@@ -10,8 +10,6 @@
 		/** Dotted path into Config. The range, the hint, the issue and the change all key off it. */
 		field: string;
 		value: number;
-		/** Defaults to 0.05 on a 0..1 field, else 1, so a share slider does not snap to full. */
-		step?: number;
 		unit?: string;
 		issues?: ConfigIssue[];
 		diff?: ConfigDiff;
@@ -21,14 +19,13 @@
 		label,
 		field,
 		value = $bindable(),
-		step,
 		unit,
 		issues = [],
 		diff = EMPTY_DIFF
 	}: Props = $props();
 
 	const meta = $derived(schemaField(field));
-	const gap = $derived(step ?? ((meta.maximum ?? 1) <= 1 ? 0.05 : 1));
+	const gap = $derived(schemaStep(field));
 	const issue = $derived(issues.find((i) => i.field === field)?.message);
 	const change = $derived(diff.changes[field]);
 	const id = $props.id();

@@ -235,7 +235,6 @@
 					label="Guest share of tagged photos"
 					field="people.withShare"
 					bind:value={config.people.withShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
@@ -421,7 +420,6 @@
 					label="Home radius"
 					field="clustering.homeKm"
 					bind:value={config.clustering.homeKm}
-					step={0.5}
 					unit="km"
 					{issues}
 					{diff}
@@ -430,7 +428,6 @@
 					label="Place radius"
 					field="clustering.placeKm"
 					bind:value={config.clustering.placeKm}
-					step={0.5}
 					unit="km"
 					{issues}
 					{diff}
@@ -439,7 +436,6 @@
 					label="Place radius cap"
 					field="clustering.placeKmMax"
 					bind:value={config.clustering.placeKmMax}
-					step={0.5}
 					unit="km"
 					{issues}
 				/>
@@ -447,7 +443,6 @@
 					label="Label merge radius"
 					field="clustering.mergeLabelKm"
 					bind:value={config.clustering.mergeLabelKm}
-					step={0.5}
 					unit="km"
 					{issues}
 					{diff}
@@ -456,7 +451,6 @@
 					label="Dominant place share"
 					field="clustering.dominantShare"
 					bind:value={config.clustering.dominantShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
@@ -464,7 +458,6 @@
 					label="Region share"
 					field="clustering.regionShare"
 					bind:value={config.clustering.regionShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
@@ -472,7 +465,6 @@
 					label="Leading place share"
 					field="clustering.leadShare"
 					bind:value={config.clustering.leadShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
@@ -509,7 +501,6 @@
 					label="Gathering gap"
 					field="clustering.gatherGapHours"
 					bind:value={config.clustering.gatherGapHours}
-					step={0.5}
 					unit="hours"
 					{issues}
 					{diff}
@@ -701,7 +692,6 @@
 					label="Event absorb share"
 					field="clustering.eventAbsorbShare"
 					bind:value={config.clustering.eventAbsorbShare}
-					step={0.05}
 					{issues}
 					{diff}
 				/>
