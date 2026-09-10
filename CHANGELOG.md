@@ -1,4 +1,4 @@
-# immich-auto-albums-ts
+# immich-auto-albums
 
 ## 1.1.0
 
