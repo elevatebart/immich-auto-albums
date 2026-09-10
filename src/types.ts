@@ -51,6 +51,7 @@ export interface Config {
     mergeLabelKm: number;
     dominantShare: number;
     regionShare: number;
+    leadShare: number;
     zoneShare: number;
     tripGapHours: number;
     tripMinPhotos: number;

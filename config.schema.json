@@ -172,6 +172,13 @@
           "description": "Share one region needs before the other regions are ignored in the name.",
           "default": 0.8
         },
+        "leadShare": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Share the leading place needs to name a trip no region carries, when it doubles the runner-up.",
+          "default": 0.35
+        },
         "zoneShare": {
           "type": "number",
           "minimum": 0,

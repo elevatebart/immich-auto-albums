@@ -44,7 +44,7 @@ describe("rule engines", () => {
     expect(names.some((n) => n.startsWith("person|Nadia 2026"))).toBe(false); // 5 < household min 10
   });
 
-  it("place hierarchy: village merge, state, country, two countries, no-people places", () => {
+  it("place hierarchy: village merge, state, two states, two countries, no-people places", () => {
     const ctx = makeContext(cfg, NOW, 9000);
     const trip = (off: number, spots: [number, number, string, string, string, number, string[]][]) => {
       const b = new Date(Date.UTC(2025, 0, 1 + off));
@@ -55,16 +55,24 @@ describe("rule engines", () => {
     const A = [
       ...trip(0, [[46.28, 6.16, "Versoix", "Genève", "Switzerland", 8, ["Antoine Fontaine"]], [46.31, 6.19, "Coppet", "Vaud", "Switzerland", 6, ["Antoine Fontaine"]]]),
       ...trip(30, [[45.05, 5.28, "Saint-Thomas-en-Royans", "AURA", "France", 10, []], [45.06, 5.31, "Sainte-Eulalie-en-Royans", "AURA", "France", 6, []]]),
-      ...trip(60, [[41.88, -87.63, "Chicago", "Illinois", "USA", 8, []], [42.05, -88.08, "Schaumburg", "Illinois", "USA", 6, []], [41.5, -90.5, "Moline", "Illinois", "USA", 5, []]]),
-      ...trip(90, [[29.76, -95.37, "Houston", "Texas", "USA", 8, []], [27.77, -82.64, "St. Petersburg", "Florida", "USA", 7, []]]),
-      ...trip(120, [[48.85, 2.35, "Paris 09 Opéra", "IdF", "France", 8, []], [51.5, -0.12, "City of Westminster", "England", "UK", 7, []]]),
+      ...trip(60, [[41.88, -87.63, "Chicago", "Illinois", "United States of America", 8, []], [42.05, -88.08, "Schaumburg", "Illinois", "United States of America", 6, []], [41.5, -90.5, "Moline", "Illinois", "United States of America", 5, []]]),
+      ...trip(90, [[29.76, -95.37, "Houston", "Texas", "United States of America", 8, []], [27.77, -82.64, "St. Petersburg", "Florida", "United States of America", 7, []]]),
+      // Three states, so no pair carries the trip: the country names it, through its alias.
+      ...trip(120, [[29.76, -95.37, "Houston", "Texas", "United States of America", 6, []], [27.77, -82.64, "St. Petersburg", "Florida", "United States of America", 5, []], [34.05, -118.24, "Los Angeles", "California", "United States of America", 5, []]]),
+      ...trip(150, [[48.85, 2.35, "Paris 09 Opéra", "IdF", "France", 8, []], [51.5, -0.12, "City of Westminster", "England", "UK", 7, []]]),
+      // A road trip through four states: no region carries it, so the leading city names it.
+      ...trip(180, [[29.95, -90.07, "New Orleans", "Louisiana", "United States of America", 13, []], [37.46, -89.24, "Anna", "Illinois", "United States of America", 5, []], [43.47, -89.74, "Baraboo", "Wisconsin", "United States of America", 4, []], [35.15, -90.05, "Memphis", "Tennessee", "United States of America", 3, []]]),
     ];
     expect(planTrips(ctx, A).map((p) => p.name)).toEqual([
       "Versoix, Jan 2025",
       "Saint-Thomas-en-Royans, Jan-Feb 2025",
       "Illinois, Mar 2025",
-      "USA, Apr 2025",
-      "France & UK, May 2025",
+      // Two states of one country: both are named, since "USA" says nothing about where.
+      "Texas & Florida, Apr 2025",
+      "USA, May 2025",
+      // Two countries: the pair stays at country level rather than naming their regions.
+      "France & UK, May-Jun 2025",
+      "New Orleans, Jun-Jul 2025",
     ]);
   });
 
@@ -82,7 +90,8 @@ describe("rule engines", () => {
     const tight = spots(30, [[35.69, 139.7, "Tokyo", "Kanto", 10], [35.63, 139.88, "Chiba", "Kanto", 8]]);
     expect(planTrips(ctx, [...wide, ...tight]).map((p) => p.name)).toEqual(["Tokyo, Jan 2025", "Kanto, Jan-Feb 2025"]);
     const off = { ...cfg, clustering: { ...cfg.clustering, placeKmMax: cfg.clustering.placeKm } };
-    expect(planTrips(makeContext(off, NOW, 9000), wide).map((p) => p.name)).toEqual(["Japan, Jan 2025"]);
+    // No place dominates without the merge, so the two regions name it instead of the country.
+    expect(planTrips(makeContext(off, NOW, 9000), wide).map((p) => p.name)).toEqual(["Kanto & Kansai, Jan 2025"]);
   });
 
   it("a French departement names the trip, unless the region is one to keep", () => {
@@ -262,7 +271,8 @@ describe("rule engines", () => {
 
     const B = burst(new Date("2020-08-05T00:00:00Z"), 66, 4, (t) => mk(t, 44.0, -86.5, null, null, "United States of America"));
     const { plans } = plan(cfg, B, { now: NOW, windowDays: 9000 });
-    expect(plans.find((p) => p.kind === "trip")!.name).toBe("United States of America, Aug 2020");
+    // No city and no state: only the country is left, and the alias shortens it.
+    expect(plans.find((p) => p.kind === "trip")!.name).toBe("USA, Aug 2020");
   });
 });
 

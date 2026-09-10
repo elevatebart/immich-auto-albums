@@ -469,6 +469,14 @@
 					{diff}
 				/>
 				<Slider
+					label="Leading place share"
+					field="clustering.leadShare"
+					bind:value={config.clustering.leadShare}
+					step={0.05}
+					{issues}
+					{diff}
+				/>
+				<Slider
 					label="Trip gap"
 					field="clustering.tripGapHours"
 					bind:value={config.clustering.tripGapHours}
