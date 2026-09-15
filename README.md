@@ -26,10 +26,14 @@ years, seasons and fixed events are planned only when the window covers them in 
 ## Stacks
 
 A stack in Immich is one entry with a primary shot and the rest of the burst behind it. Set `primary_only = true`
-under `[stacks]` (the checkbox in the form, or `--primary-only` / `PRIMARY_ONLY=1` on the CLI) and only that primary
-joins an album. The other shots then count for nothing, thresholds included, so a burst-heavy day can drop under
-`daytrip_min_photos` and lose its album. The first apply after turning it on also takes those shots out of the albums
-already created, which removes them from the album and not from your library.
+under `[stacks]` (the checkbox in the form, or `--primary-only` / `PRIMARY_ONLY=1` on the CLI) and an album keeps the
+primary and not the shots behind it. A photo in no stack is a primary, so it is always kept.
+
+The filter runs after the planner, on album membership alone: clustering, naming and every threshold still see the
+whole burst, so the same albums exist with it on or off and none is ever lost to it. A shot is only left out when the
+album also holds its primary, so a burst whose primary is not in that album stays as it is rather than vanishing from
+it. The first apply after turning it on takes those shots out of the albums already created, which is a removal from
+the album and not from your library.
 
 Reading stacks needs the `stack.read` permission. A key minted before this option does not carry it, so run
 `npm run login` again, or add it to the key in Immich.

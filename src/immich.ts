@@ -128,23 +128,23 @@ export class ImmichClient {
     return out;
   }
 
-  /** Ids of every stacked photo that is not its stack's primary. One call, the whole library. */
-  async stackChildIds(): Promise<Set<string>> {
+  /** Every photo sitting behind a primary, to that primary. One call, the whole library. */
+  async stackPrimaries(): Promise<Map<string, string>> {
     const stacks: any[] = (await this.api("GET", "/stacks")) ?? [];
-    const out = new Set<string>();
+    const out = new Map<string, string>();
     for (const s of stacks) {
-      for (const a of s.assets ?? []) if (a.id !== s.primaryAssetId) out.add(a.id);
+      for (const a of s.assets ?? []) if (a.id !== s.primaryAssetId) out.set(a.id, s.primaryAssetId);
     }
     return out;
   }
 
-  /** Marks the assets a stack holds behind its primary. Mutates, and returns how many were marked. */
+  /** Marks the photos a stack holds behind its primary. Mutates, and returns how many were marked. */
   async attachStacks(assets: Map<string, Asset>): Promise<number> {
     let n = 0;
-    for (const id of await this.stackChildIds()) {
+    for (const [id, primary] of await this.stackPrimaries()) {
       const a = assets.get(id);
       if (!a) continue;
-      a.stackChild = true;
+      a.stackPrimary = primary;
       n++;
     }
     return n;

@@ -4,7 +4,7 @@ import { env } from '$env/dynamic/private';
 import { loadConfig } from '$core/config.js';
 import { ImmichClient, ImmichHttpError, type PlaceHit } from '$core/immich.js';
 import { dayOf, haversineKm, makeContext, plan } from '$core/planner.js';
-import { orphans, reconcile } from '$core/reconcile.js';
+import { orphans, primariesOnly, reconcile } from '$core/reconcile.js';
 import type { Action, Asset, Config, ManagedAlbum, Scope } from '$core/types.js';
 import type { Preview, PreviewRow, Town } from '$lib/types';
 import { credential, immichUrl } from './credentials.js';
@@ -202,11 +202,12 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 	const asked = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
 	const reach = snap.since ? (now.getTime() - snap.since.getTime()) / (24 * 3_600_000) : asked;
 	const windowDays = scope === 'all' ? asked : Math.min(asked, reach);
-	// A stacked photo is dropped before planning, so it counts for nothing, thresholds included.
 	if (cfg.stacks.primaryOnly && snap.stackError) throw new PreviewError(502, snap.stackError);
-	const stacked = cfg.stacks.primaryOnly ? snap.assets.filter((a) => a.stackChild).length : 0;
-	const assets = stacked ? snap.assets.filter((a) => !a.stackChild) : snap.assets;
-	const { plans, absorbed, folded } = plan(cfg, assets, { now, windowDays, scope });
+	const { plans: clustered, absorbed, folded } = plan(cfg, snap.assets, { now, windowDays, scope });
+	// Clustering saw every shot of every burst; only the album membership is narrowed.
+	const plans = cfg.stacks.primaryOnly ? primariesOnly(clustered, snap.assets) : clustered;
+	const held = (ps: typeof plans) => ps.reduce((n, p) => n + p.ids.length, 0);
+	const stacked = cfg.stacks.primaryOnly ? held(clustered) - held(plans) : 0;
 	const actions = reconcile(plans, snap.albums);
 	const windowStart = makeContext(cfg, now, windowDays, scope).windowStart;
 	// In window scope everything older than the window is unclaimed, and that is not news.
@@ -222,7 +223,7 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 	const rows = actions.map(rowOf);
 	const count = (op: PreviewRow['op']) => rows.filter((r) => r.op === op).length;
 	const gps = new Map<string, { lat: number; lon: number }>();
-	for (const a of assets) {
+	for (const a of snap.assets) {
 		if (a.lat !== null && a.lon !== null) gps.set(a.id, { lat: a.lat, lon: a.lon });
 	}
 	return {
@@ -240,9 +241,9 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 			token: tokenOf(rows),
 			draft,
 			stats: {
-				assets: assets.length,
+				assets: snap.assets.length,
 				stacked,
-				withGps: assets.filter((a) => a.lat !== null).length,
+				withGps: snap.assets.filter((a) => a.lat !== null).length,
 				people: snap.people,
 				absorbed: absorbed.size,
 				folded: folded.length,
@@ -293,7 +294,6 @@ export async function townsNear(lat: number, lon: number, km: number): Promise<T
 	const snap = await getSnapshot(reachOf(cfg, 'window', new Date()));
 	const towns = new Map<string, Town>();
 	for (const a of snap.assets) {
-		if (cfg.stacks.primaryOnly && a.stackChild) continue;
 		if (!a.city || a.lat === null || a.lon === null) continue;
 		if (haversineKm(a.lat, a.lon, lat, lon) > km) continue;
 		const t = towns.get(a.city) ?? { name: a.city, lat: a.lat, lon: a.lon, district: a.district ?? null, photos: 0 };

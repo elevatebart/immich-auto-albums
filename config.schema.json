@@ -43,7 +43,7 @@
         "primaryOnly": {
           "type": "boolean",
           "default": false,
-          "description": "Only the primary photo of a stack joins an album. The other shots are ignored everywhere, thresholds included."
+          "description": "An album keeps the primary of a stack and not the shots behind it. A photo in no stack is a primary. Clustering and every threshold still see the whole burst."
         }
       },
       "required": [],

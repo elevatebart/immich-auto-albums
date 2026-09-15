@@ -96,7 +96,7 @@ export function toToml(c: Config): string {
   row("marker", q(c.immich.marker), "album description prefix; only tagged albums are ever touched");
 
   head("[stacks]");
-  row("primary_only", c.stacks.primaryOnly, "only the primary photo of a stack joins an album");
+  row("primary_only", c.stacks.primaryOnly, "an album keeps the primary of a stack, not the shots behind it");
 
   head("[people]");
   row("me", q(c.people.me));

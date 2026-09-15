@@ -18,7 +18,7 @@ const stub = (reply: { status?: number; json?: unknown }) => {
 const client = () => new ImmichClient(URL_, { kind: "key", value: "sk-1" });
 
 describe("attachStacks", () => {
-  it("marks every stacked photo except the primary", async () => {
+  it("marks every stacked photo with its primary, and leaves unstacked photos alone", async () => {
     stub({
       json: [
         { id: "s1", primaryAssetId: "a1", assets: [{ id: "a1" }, { id: "a2" }, { id: "a3" }] },
@@ -27,14 +27,14 @@ describe("attachStacks", () => {
     });
     const assets = new Map(["a1", "a2", "a3", "b1", "b2", "c1"].map((id) => [id, asset(id)]));
     expect(await client().attachStacks(assets)).toBe(3);
-    expect([...assets.values()].filter((a) => a.stackChild).map((a) => a.id)).toEqual(["a2", "a3", "b2"]);
+    expect([...assets.values()].map((a) => a.stackPrimary)).toEqual([undefined, "a1", "a1", undefined, "b1", undefined]);
   });
 
   it("ignores stacked photos outside the fetched window", async () => {
     stub({ json: [{ id: "s1", primaryAssetId: "old1", assets: [{ id: "old1" }, { id: "old2" }] }] });
     const assets = new Map([["a1", asset("a1")]]);
     expect(await client().attachStacks(assets)).toBe(0);
-    expect(assets.get("a1")!.stackChild).toBeUndefined();
+    expect(assets.get("a1")!.stackPrimary).toBeUndefined();
   });
 
   it("propagates a refused read, since planning as if nothing were stacked would be wrong", async () => {

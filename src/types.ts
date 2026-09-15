@@ -9,8 +9,8 @@ export interface Asset {
   country: string | null;
   /** Geocoder admin2, a French departement. Not in Immich exif; the fetch layer looks it up. */
   district?: string | null;
-  /** A member of a stack that is not its primary. Dropped before planning when primaryOnly is on. */
-  stackChild?: boolean;
+  /** Id of this stack's primary. Unset means there is no stack, which counts as primary. */
+  stackPrimary?: string;
   people: Set<string>;
 }
 

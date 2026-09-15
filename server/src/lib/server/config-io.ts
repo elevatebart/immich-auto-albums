@@ -71,7 +71,7 @@ export function warningsFor(current: Config, next: Config): string[] {
 	}
 	if (!current.stacks.primaryOnly && next.stacks.primaryOnly) {
 		out.push(
-			'Only the primary photo of a stack joins an album from now on. The next apply takes the other shots out of the albums this tool manages, and a cluster that falls under its photo threshold loses its album. Nothing leaves your library.'
+			'Albums keep the primary of a stack from now on. The next apply takes the shots behind it out of the albums this tool manages, which can be most of a burst-heavy album. Clustering is untouched, so the same albums stay, and nothing leaves your library.'
 		);
 	}
 	if (next.immich.windowDays < current.immich.windowDays) {

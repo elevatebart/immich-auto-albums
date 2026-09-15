@@ -79,10 +79,13 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Nothing here deletes an album. `orphans(actions, albums, since?)` in `reconcile.ts` lists managed albums
   no plan claims any more, which the CLI logs and the server puts in `Preview.warnings`. Pass `since` in
   `window` scope, or every album older than the window is reported on every run.
-- `stacks.primary_only` drops every non-primary member of a stack before `plan()` is called, in the CLI and in
-  `planWith`, so a stacked shot counts for nothing, thresholds included. The planner never sees the flag. The server
-  fetches the stacks whatever the setting, so the form's checkbox replans off the snapshot instead of refetching;
-  when the fetch failed and the setting is on, the plan is refused rather than computed over the whole stack.
+- `stacks.primary_only` narrows album membership, never the clustering: `primariesOnly(plans, assets)` in
+  `reconcile.ts` runs on the output of `plan()`, so thresholds, names and the set of albums are identical with it on
+  or off. `Asset.stackPrimary` holds the id of the stack's primary and is unset on a primary and on any photo in no
+  stack. A shot is dropped only when the same plan also holds its primary, so a burst whose primary a person year
+  does not carry keeps its shots instead of losing the moment. The server fetches the stacks whatever the setting,
+  so the form's checkbox replans off the snapshot instead of refetching; when the fetch failed and the setting is
+  on, the plan is refused rather than computed as if nothing were stacked.
 - `person_years.favorites` is the allowlist for person albums. Empty means everyone over the threshold, which
   is the behaviour from before the key; `household` still only lowers the photo count, it does not grant an album.
 - In `window` scope a person year, season or fixed event is planned only when the window covers it in full, so a

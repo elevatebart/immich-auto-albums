@@ -5,7 +5,7 @@ import { loadConfig } from "./config.js";
 import { ImmichClient, ImmichHttpError } from "./immich.js";
 import { runLogin } from "./login.js";
 import { dayOf, makeContext, plan, taggedSince } from "./planner.js";
-import { descriptionFor, orphans, reconcile } from "./reconcile.js";
+import { descriptionFor, orphans, primariesOnly, reconcile } from "./reconcile.js";
 import type { Scope } from "./types.js";
 
 const mode = process.argv[2] === "apply" ? "apply" : "preview";
@@ -69,7 +69,7 @@ await client.checkAuth().catch((e: Error) => {
 const assets = await client.fetchAssets(scope === "window" ? ctx.windowStart : undefined);
 log(`Assets: ${assets.size} (${[...assets.values()].filter((a) => a.lat !== null).length} with GPS)`);
 if (primaryOnly) {
-  const marked = await client.attachStacks(assets).catch((e: Error) => {
+  const behind = await client.attachStacks(assets).catch((e: Error) => {
     const status = e instanceof ImmichHttpError ? e.status : 0;
     const hint =
       status === 401 || status === 403
@@ -78,7 +78,7 @@ if (primaryOnly) {
     log(`FATAL: stacks.primary_only is on but ${hint}`);
     process.exit(1);
   });
-  log(`Stacks: ${marked} photos sit behind a primary and are left out`);
+  log(`Stacks: ${behind} photos sit behind a primary`);
 }
 const districts = await client.attachDistricts(assets, cfg.naming.districtCountries);
 if (districts.size) {
@@ -93,11 +93,16 @@ const named = [...cfg.people.household, ...cfg.personYears.favorites];
 const missing = [...new Set(named)].filter((h) => !people.some((p) => p.name === h));
 if (missing.length) log(`WARN: configured names not found in Immich People: ${missing.join(", ")}`);
 
-// A stacked photo is dropped before planning, so it counts for nothing, thresholds included.
-const planned = [...assets.values()].filter((a) => !(primaryOnly && a.stackChild));
-const { plans, absorbed, folded } = plan(cfg, planned, { windowDays, scope });
+const all = [...assets.values()];
+const { plans: clustered, absorbed, folded } = plan(cfg, all, { windowDays, scope });
+// Clustering saw every shot of every burst; only the album membership is narrowed.
+const plans = primaryOnly ? primariesOnly(clustered, all) : clustered;
 const byKind = plans.reduce<Record<string, number>>((m, p) => ((m[p.kind] = (m[p.kind] ?? 0) + 1), m), {});
 log(`Plans: ${JSON.stringify(byKind)}; GPS-less photos absorbed into trips: ${absorbed.size}`);
+if (primaryOnly) {
+  const held = (ps: typeof plans) => ps.reduce((n, p) => n + p.ids.length, 0);
+  log(`Stacks: ${held(clustered) - held(plans)} photos left out of albums, behind a primary the album keeps`);
+}
 for (const f of folded) log(`  folded ${f.plan.kind} "${f.plan.name}" (${f.plan.ids.length}) into event "${f.event}"`);
 
 const existing = await client.fetchManagedAlbums(cfg.immich.marker);

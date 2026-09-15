@@ -1,4 +1,4 @@
-import type { Action, ManagedAlbum, Plan, PlanKind } from "./types.js";
+import type { Action, Asset, ManagedAlbum, Plan, PlanKind } from "./types.js";
 
 const STABLE_KINDS: PlanKind[] = ["person", "season", "event"];
 const DAY = 86_400_000;
@@ -39,6 +39,24 @@ export function matchExisting(plan: Plan, existing: ManagedAlbum[], used: Set<st
     if (score > bestScore) [best, bestScore] = [al, score];
   }
   return bestScore >= 0.5 ? best : null;
+}
+
+/**
+ * Drops the photos a stack holds behind a primary the same album already carries. Runs after the
+ * planner, so clustering, naming and every threshold still see the whole burst and no album is lost.
+ * A photo in no stack, or one whose primary this album does not hold, is a primary here and stays.
+ */
+export function primariesOnly(plans: Plan[], assets: Asset[]): Plan[] {
+  const primaryOf = new Map(assets.filter((a) => a.stackPrimary).map((a) => [a.id, a.stackPrimary!]));
+  if (!primaryOf.size) return plans;
+  return plans.map((plan) => {
+    const here = new Set(plan.ids);
+    const ids = plan.ids.filter((id) => {
+      const primary = primaryOf.get(id);
+      return primary === undefined || !here.has(primary);
+    });
+    return ids.length === plan.ids.length ? plan : { ...plan, ids };
+  });
 }
 
 export function reconcile(plans: Plan[], existing: ManagedAlbum[]): Action[] {

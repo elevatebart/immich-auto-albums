@@ -28,7 +28,7 @@ export interface PreviewStats {
 	assets: number;
 	withGps: number;
 	people: number;
-	/** Photos left out because they sit behind a stack's primary. 0 when primary_only is off. */
+	/** Photos no album takes because it keeps their stack's primary instead. 0 when primary_only is off. */
 	stacked: number;
 	absorbed: number;
 	/** Cluster albums given up to a hand-declared event instead. */

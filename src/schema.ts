@@ -31,7 +31,7 @@ export const configSchema = {
     }),
     stacks: {
       ...obj({
-        primaryOnly: bool("Only the primary photo of a stack joins an album. The other shots are ignored everywhere, thresholds included.", false),
+        primaryOnly: bool("An album keeps the primary of a stack and not the shots behind it. A photo in no stack is a primary. Clustering and every threshold still see the whole burst.", false),
       }),
       default: { primaryOnly: false },
     },
