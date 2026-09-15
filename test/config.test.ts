@@ -25,6 +25,14 @@ describe("toToml", () => {
     expect(fromToml(bare).events).toEqual([]);
   });
 
+  it("round trips primary_only and defaults it off when the section is missing", () => {
+    expect(cfg.stacks.primaryOnly).toBe(false);
+    expect(fromToml(toToml({ ...cfg, stacks: { primaryOnly: true } })).stacks.primaryOnly).toBe(true);
+    const without = text.replace(/\[stacks\][\s\S]*?\n\n/, "");
+    expect(without).not.toContain("primary_only");
+    expect(fromToml(without).stacks.primaryOnly).toBe(false);
+  });
+
   it("escapes quotes in names and alias keys", () => {
     const odd = { ...cfg, aliases: { 'A "B"': "C" }, people: { ...cfg.people, me: 'Bart "the" Ledoux' } };
     const back = fromToml(toToml(odd));

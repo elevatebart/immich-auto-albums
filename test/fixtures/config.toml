@@ -7,6 +7,12 @@ out_dir = "."                                   # logs and decision CSVs
 window_days = 365                               # rolling recompute window; WINDOW_DAYS env overrides
 marker = "[auto-albums]"                        # album description prefix; only tagged albums are ever touched
 
+[stacks]
+# Immich stacks a burst into one entry with a primary shot. With this on, an album keeps that
+# primary and not the shots behind it; a photo in no stack is a primary. Clustering still sees
+# the whole burst, so no album appears or disappears because of this. CLI: --primary-only.
+primary_only = false
+
 [people]
 me = "Sam Rivers"
 household = ["Sam Rivers", "Nadia Rivers", "Theo Rivers"]

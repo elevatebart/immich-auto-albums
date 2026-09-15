@@ -69,6 +69,11 @@ export function warningsFor(current: Config, next: Config): string[] {
 			`Changing the marker to ${next.immich.marker} orphans the albums tagged ${current.immich.marker}: they stop being found, and the next apply creates new ones.`
 		);
 	}
+	if (!current.stacks.primaryOnly && next.stacks.primaryOnly) {
+		out.push(
+			'Albums keep the primary of a stack from now on. The next apply takes the shots behind it out of the albums this tool manages, which can be most of a burst-heavy album. Clustering is untouched, so the same albums stay, and nothing leaves your library.'
+		);
+	}
 	if (next.immich.windowDays < current.immich.windowDays) {
 		out.push(
 			`The window shrinks from ${current.immich.windowDays} to ${next.immich.windowDays} days, so trips and gatherings before that fall out of the plan. Existing albums are left alone.`

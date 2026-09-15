@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { readFileSync } from "node:fs";
 import { fromToml } from "../src/config.js";
 import { foldIntoEvents, plan, planFixedEvents, planTrips, makeContext, taggedSince, yearsCovered } from "../src/planner.js";
-import { descriptionFor, orphans, parseDescription, reconcile } from "../src/reconcile.js";
+import { descriptionFor, orphans, parseDescription, primariesOnly, reconcile } from "../src/reconcile.js";
 import type { Asset, ManagedAlbum } from "../src/types.js";
 
 const cfg = fromToml(readFileSync(new URL("./fixtures/config.toml", import.meta.url), "utf8"));
@@ -330,6 +330,37 @@ describe("reconcile", () => {
     // Same photos, same name: nothing to do.
     const same: ManagedAlbum = { ...named, id: "w", name: trip.name, auto: trip.name };
     expect(reconcile([trip], [same])[0].op).toBe("noop");
+  });
+
+  it("keeps the album a burst earned while putting only its primary in it", () => {
+    const b = new Date("2026-08-10T10:00:00Z");
+    const shots = burst(b, 12, 6, (t) => mk(t, 45.9, 6.13, "Annecy"));
+    // Every shot but the first of each pair sits behind the one before it.
+    const stacked = shots.map((a, i) => (i % 2 ? { ...a, stackPrimary: shots[i - 1].id } : a));
+    const { plans } = plan(cfg, stacked, { now: NOW });
+    const trip = plans.find((p) => p.kind === "trip")!;
+    const [narrowed] = primariesOnly([trip], stacked);
+    expect(trip.ids).toHaveLength(12);
+    expect(narrowed.ids).toHaveLength(6);
+    expect(narrowed.name).toBe(trip.name);
+    // The album it already filled is still matched, so nothing is recreated and nothing is orphaned.
+    const album: ManagedAlbum = { id: "x", name: trip.name, auto: trip.name, kind: "trip", key: trip.key, assets: new Set(trip.ids) };
+    const [action] = reconcile([narrowed], [album]);
+    expect([action.op, action.op === "update" && action.remove.length]).toEqual(["update", 6]);
+    expect(orphans([action], [album])).toEqual([]);
+  });
+
+  it("calls a photo in no stack a primary, and keeps a shot whose primary this album lacks", () => {
+    const p = { kind: "trip" as const, key: "2026-08-10", name: "Annecy, Aug 2026", ids: ["lone", "behind"], start: NOW };
+    const assets = [
+      mk(NOW, null, null, null),
+      { ...mk(NOW, null, null, null), id: "behind", stackPrimary: "elsewhere" },
+    ];
+    assets[0].id = "lone";
+    expect(primariesOnly([p], assets)[0].ids).toEqual(["lone", "behind"]);
+    // The same shot goes once its primary is in the album too.
+    const withPrimary = { ...p, ids: ["lone", "behind", "elsewhere"] };
+    expect(primariesOnly([withPrimary], assets)[0].ids).toEqual(["lone", "elsewhere"]);
   });
 
   it("reports managed albums no plan claims any more", () => {

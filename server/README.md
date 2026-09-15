@@ -32,6 +32,9 @@ session token is ever sent to the browser or written to the config. `server/.env
   with the create/update/rename/noop op, rename flags, asset counts and the cluster centroid. Asset ids stay
   on the server. `?refresh=1` rescans the library, which is the only slow part and is cached for 10 minutes. The
   snapshot records how far back it fetched; a longer window refetches, a shorter one reuses it.
+- The stacks are read on every scan, so the "only the primary of a stack" checkbox replans off the snapshot in
+  milliseconds. It only narrows what each album holds, so the rows stay the same and their photo counts move. A
+  credential without `stack.read` only breaks the plans that ask for it, with a 502 saying so.
 - `POST /api/preview` with `{ config }` -> the same shape for an unsaved config, planned over the cached
   library in a few milliseconds. It carries `draft: true` and no token, so apply can never write a plan
   that came from a config the file does not have.
@@ -100,7 +103,7 @@ twice. `src/schema.ts` deliberately has no Ajv import, which keeps the validator
 imports `validateConfig` from `src/validate.ts` instead.
 
 There is no auth in front of any of this, so bind it to the LAN. A signed in session carries the full rights of that
-Immich account, where `IMMICH_API_KEY` carries nine permissions, so sign out when you are done.
+Immich account, where `IMMICH_API_KEY` carries ten permissions, so sign out when you are done.
 
 ## Build
 

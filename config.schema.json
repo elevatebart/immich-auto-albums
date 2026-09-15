@@ -37,6 +37,21 @@
       ],
       "additionalProperties": false
     },
+    "stacks": {
+      "type": "object",
+      "properties": {
+        "primaryOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "An album keeps the primary of a stack and not the shots behind it. A photo in no stack is a primary. Clustering and every threshold still see the whole burst."
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "default": {
+        "primaryOnly": false
+      }
+    },
     "people": {
       "type": "object",
       "properties": {

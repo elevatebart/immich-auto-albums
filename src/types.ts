@@ -9,6 +9,8 @@ export interface Asset {
   country: string | null;
   /** Geocoder admin2, a French departement. Not in Immich exif; the fetch layer looks it up. */
   district?: string | null;
+  /** Id of this stack's primary. Unset means there is no stack, which counts as primary. */
+  stackPrimary?: string;
   people: Set<string>;
 }
 
@@ -35,6 +37,7 @@ export interface FixedEvent {
 
 export interface Config {
   immich: { url: string; outDir: string; windowDays: number; marker: string };
+  stacks: { primaryOnly: boolean };
   people: {
     me: string;
     household: string[];

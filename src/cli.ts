@@ -5,7 +5,7 @@ import { loadConfig } from "./config.js";
 import { ImmichClient, ImmichHttpError } from "./immich.js";
 import { runLogin } from "./login.js";
 import { dayOf, makeContext, plan, taggedSince } from "./planner.js";
-import { descriptionFor, orphans, reconcile } from "./reconcile.js";
+import { descriptionFor, orphans, primariesOnly, reconcile } from "./reconcile.js";
 import type { Scope } from "./types.js";
 
 const mode = process.argv[2] === "apply" ? "apply" : "preview";
@@ -35,6 +35,7 @@ const apiKey = process.env.IMMICH_API_KEY ?? "";
 const outDir = process.env.OUT ?? cfg.immich.outDir;
 const windowDays = Number(process.env.WINDOW_DAYS ?? cfg.immich.windowDays);
 const scope: Scope = process.argv.includes("--all") || process.env.SCOPE === "all" ? "all" : "window";
+const primaryOnly = cfg.stacks.primaryOnly || process.argv.includes("--primary-only") || process.env.PRIMARY_ONLY === "1";
 const stamp = new Date().toISOString().replace(/[-:]/g, "").slice(0, 15).replace("T", "_");
 
 await mkdir(outDir, { recursive: true });
@@ -52,7 +53,7 @@ if (!apiKey) {
 const client = new ImmichClient(url, { kind: "key", value: apiKey });
 const ctx = makeContext(cfg, new Date(), windowDays, scope);
 log(
-  `Started. mode=${mode} scope=${scope} window since ${ctx.windowStart.toISOString().slice(0, 10)}` +
+  `Started. mode=${mode} scope=${scope} primary_only=${primaryOnly} window since ${ctx.windowStart.toISOString().slice(0, 10)}` +
     (scope === "window" ? " (person years, seasons and events outside it are left alone; --all for everything)" : ""),
 );
 await client.checkAuth().catch((e: Error) => {
@@ -67,6 +68,18 @@ await client.checkAuth().catch((e: Error) => {
 
 const assets = await client.fetchAssets(scope === "window" ? ctx.windowStart : undefined);
 log(`Assets: ${assets.size} (${[...assets.values()].filter((a) => a.lat !== null).length} with GPS)`);
+if (primaryOnly) {
+  const behind = await client.attachStacks(assets).catch((e: Error) => {
+    const status = e instanceof ImmichHttpError ? e.status : 0;
+    const hint =
+      status === 401 || status === 403
+        ? "the credential cannot read stacks. A key minted before this option lacks stack.read: run `npm run login` for a new one."
+        : e.message;
+    log(`FATAL: stacks.primary_only is on but ${hint}`);
+    process.exit(1);
+  });
+  log(`Stacks: ${behind} photos sit behind a primary`);
+}
 const districts = await client.attachDistricts(assets, cfg.naming.districtCountries);
 if (districts.size) {
   const named = [...assets.values()].filter((a) => a.district).length;
@@ -80,9 +93,16 @@ const named = [...cfg.people.household, ...cfg.personYears.favorites];
 const missing = [...new Set(named)].filter((h) => !people.some((p) => p.name === h));
 if (missing.length) log(`WARN: configured names not found in Immich People: ${missing.join(", ")}`);
 
-const { plans, absorbed, folded } = plan(cfg, [...assets.values()], { windowDays, scope });
+const all = [...assets.values()];
+const { plans: clustered, absorbed, folded } = plan(cfg, all, { windowDays, scope });
+// Clustering saw every shot of every burst; only the album membership is narrowed.
+const plans = primaryOnly ? primariesOnly(clustered, all) : clustered;
 const byKind = plans.reduce<Record<string, number>>((m, p) => ((m[p.kind] = (m[p.kind] ?? 0) + 1), m), {});
 log(`Plans: ${JSON.stringify(byKind)}; GPS-less photos absorbed into trips: ${absorbed.size}`);
+if (primaryOnly) {
+  const held = (ps: typeof plans) => ps.reduce((n, p) => n + p.ids.length, 0);
+  log(`Stacks: ${held(clustered) - held(plans)} photos left out of albums, behind a primary the album keeps`);
+}
 for (const f of folded) log(`  folded ${f.plan.kind} "${f.plan.name}" (${f.plan.ids.length}) into event "${f.event}"`);
 
 const existing = await client.fetchManagedAlbums(cfg.immich.marker);

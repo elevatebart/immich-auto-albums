@@ -28,6 +28,8 @@ export interface PreviewStats {
 	assets: number;
 	withGps: number;
 	people: number;
+	/** Photos no album takes because it keeps their stack's primary instead. 0 when primary_only is off. */
+	stacked: number;
 	absorbed: number;
 	/** Cluster albums given up to a hand-declared event instead. */
 	folded: number;
@@ -152,7 +154,7 @@ export interface AlbumAssets {
 }
 
 export interface Job {
-	phase: 'assets' | 'places' | 'people' | 'albums' | 'apply';
+	phase: 'assets' | 'stacks' | 'places' | 'people' | 'albums' | 'apply';
 	/** What is being worked on right now, for example the person or album being read. */
 	label: string;
 	done: number;

@@ -51,7 +51,9 @@
 		<Stack gap={3}>
 			<Text color="muted" size="small">
 				{preview.stats.assets} assets ({preview.stats.withGps} with GPS), {preview.stats.people}
-				named people, {preview.stats.managedAlbums} managed albums, {preview.stats.absorbed}
+				named people, {preview.stats.stacked
+					? `${preview.stats.stacked} shots kept out of albums behind their primary, `
+					: ''}{preview.stats.managedAlbums} managed albums, {preview.stats.absorbed}
 				GPS-less photos absorbed into trips{preview.stats.folded
 					? `, ${preview.stats.folded} clusters folded into your events`
 					: ''}. Window since {preview.windowStart}.

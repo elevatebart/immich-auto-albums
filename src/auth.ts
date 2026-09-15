@@ -12,6 +12,7 @@ export const ALBUM_KEY_PERMISSIONS = [
   "asset.read",
   "asset.view",
   "person.read",
+  "stack.read",
   "album.read",
   "album.create",
   "album.update",
@@ -19,6 +20,9 @@ export const ALBUM_KEY_PERMISSIONS = [
   "albumAsset.delete",
   "user.read",
 ] as const;
+
+/** A syntactically valid v4 uuid, which is what the stacks filter validates. */
+const PROBE_UUID = "00000000-0000-4000-8000-000000000000";
 
 export interface Session {
   token: string;
@@ -152,6 +156,12 @@ export async function verifyCredential(url: string, cred: Credential): Promise<V
       run: () => request(url, "POST", "/search/metadata", { cred, body: { size: 1, page: 1 } }),
     },
     { label: "read people", permission: "person.read", run: () => request(url, "GET", "/people?size=1", { cred }) },
+    {
+      label: "read stacks",
+      permission: "stack.read",
+      // Filtered by a primary asset id that exists nowhere, so the probe stays an empty list.
+      run: () => request(url, "GET", `/stacks?primaryAssetId=${PROBE_UUID}`, { cred }),
+    },
   ];
   let email: string | null = null;
   const checks: Check[] = [];

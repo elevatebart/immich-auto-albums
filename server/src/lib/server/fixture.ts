@@ -40,6 +40,7 @@ export function fixtureAssets(now: Date, cfg: Config): Asset[] {
 	seq = 0;
 	const ago = (days: number) => new Date(now.getTime() - days * DAY);
 	const [first = cfg.people.me, second = cfg.people.me] = cfg.people.household;
+	const chamonix = burst(ago(20), 18, 1 / 3, (t) => mk(t, 45.92, 6.87, 'Chamonix'));
 	return [
 		// Annecy trip, plus GPS-less photos the planner should absorb into it.
 		...burst(ago(30), 12, 6, (t, i) =>
@@ -48,7 +49,9 @@ export function fixtureAssets(now: Date, cfg: Config): Asset[] {
 		...burst(ago(30), 20, 3, (t) => mk(t, null, null, null)),
 		// Two day trips.
 		...burst(ago(60), 16, 1 / 3, (t) => mk(t, 45.76, 4.84, 'Lyon')),
-		...burst(ago(20), 18, 1 / 3, (t) => mk(t, 45.92, 6.87, 'Chamonix')),
+		...chamonix,
+		// A burst Immich stacked behind the first Chamonix shot, which primary_only leaves out.
+		...burst(ago(20), 9, 1 / 60, (t) => ({ ...mk(t, 45.92, 6.87, 'Chamonix'), stackPrimary: chamonix[0].id })),
 		// Party at the Grenoble home with three guests.
 		...burst(ago(90), 32, 1 / 12, (t) =>
 			mk(t, 45.19, 5.72, 'Grenoble', ['Alice Martin', 'Bob Roy', 'Cara Li'])
