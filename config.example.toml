@@ -10,6 +10,11 @@ out_dir = "."                                   # logs and decision CSVs
 window_days = 365                               # rolling recompute window; WINDOW_DAYS env overrides
 marker = "[auto-albums]"                        # album description prefix; only tagged albums are ever touched
 
+[stacks]
+# Immich stacks a burst into one entry with a primary shot. With this on, only that primary
+# joins an album, and the other shots count for nothing, thresholds included. CLI: --primary-only.
+primary_only = false
+
 [people]
 # Names must match Immich's People page exactly, accents included.
 me = "Your Name"

@@ -37,6 +37,21 @@
       ],
       "additionalProperties": false
     },
+    "stacks": {
+      "type": "object",
+      "properties": {
+        "primaryOnly": {
+          "type": "boolean",
+          "default": false,
+          "description": "Only the primary photo of a stack joins an album. The other shots are ignored everywhere, thresholds included."
+        }
+      },
+      "required": [],
+      "additionalProperties": false,
+      "default": {
+        "primaryOnly": false
+      }
+    },
     "people": {
       "type": "object",
       "properties": {

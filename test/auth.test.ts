@@ -158,11 +158,12 @@ describe("api key", () => {
       "GET /albums": { json: [] },
       "POST /search/metadata": { json: { assets: { items: [] } } },
       "GET /people": { status: 403, json: { message: "Not permitted" } },
+      "GET /stacks": { json: [] },
     });
     const v = await verifyCredential(URL_, { kind: "key", value: "sk-123" });
     expect(v.ok).toBe(false);
     expect(v.email).toBe("me@home.test");
-    expect(v.checks.map((c) => c.ok)).toEqual([true, true, true, false]);
+    expect(v.checks.map((c) => c.ok)).toEqual([true, true, true, false, true]);
     expect(calls.every((c) => c.auth === "sk-123")).toBe(true);
   });
 
@@ -172,6 +173,7 @@ describe("api key", () => {
       "GET /albums": { json: [] },
       "POST /search/metadata": { json: { assets: { items: [] } } },
       "GET /people": { json: { people: [] } },
+      "GET /stacks": { json: [] },
     });
     expect((await verifyCredential(URL_, { kind: "bearer", value: "child-token" })).ok).toBe(true);
   });

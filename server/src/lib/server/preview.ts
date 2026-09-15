@@ -58,6 +58,8 @@ interface Snapshot {
 	now: Date;
 	/** How far back the fetch reached. null is the whole library. Nothing older than this exists here. */
 	since: Date | null;
+	/** Why the stacks could not be read, if they could not. Only fatal when primary_only is on. */
+	stackError: string | null;
 }
 
 /** Place lookups are stable, so they outlive the snapshot they were fetched for. */
@@ -70,6 +72,12 @@ export function immichClient(cfg: Config): ImmichClient {
 }
 
 export const notSignedIn = 'Not signed in to Immich.';
+
+/** A key minted before the primary_only option carries no stack.read, which is worth saying plainly. */
+const stackMessage = (e: Error) =>
+	e instanceof ImmichHttpError && (e.status === 401 || e.status === 403)
+		? 'this credential cannot read stacks. A key minted before the primary-only option lacks stack.read: sign in again, or mint a new key.'
+		: e.message;
 
 async function fromImmich(cfg: Config, now: Date, since: Date | null): Promise<Snapshot> {
 	const client = immichClient(cfg);
@@ -86,6 +94,12 @@ async function fromImmich(cfg: Config, now: Date, since: Date | null): Promise<S
 	const assets = await client.fetchAssets(since ?? undefined, (done, total) =>
 		setJob({ done, total: total > done ? total : 0 })
 	);
+	startJob('stacks', 'photos stacked behind a primary');
+	// Always fetched, so flipping primary_only in the form replans without a new library scan.
+	const stackError = await client
+		.attachStacks(assets)
+		.then(() => null)
+		.catch(stackMessage);
 	startJob('places', 'districts of the towns in the photos');
 	// Immich exif has the region but not the departement, so it takes a lookup per town.
 	placeCache = await client.attachDistricts(assets, cfg.naming.districtCountries, placeCache, (done, total, city) =>
@@ -107,14 +121,23 @@ async function fromImmich(cfg: Config, now: Date, since: Date | null): Promise<S
 		albums,
 		people: people.length,
 		now,
-		since
+		since,
+		stackError
 	};
 }
 
 function fromFixture(cfg: Config, now: Date): Snapshot {
 	const assets = fixtureAssets(now, cfg);
 	const names = new Set(assets.flatMap((a) => [...a.people]));
-	return { source: 'fixture', assets, albums: fixtureAlbums(cfg, assets, now), people: names.size, now, since: null };
+	return {
+		source: 'fixture',
+		assets,
+		albums: fixtureAlbums(cfg, assets, now),
+		people: names.size,
+		now,
+		since: null,
+		stackError: null
+	};
 }
 
 export const rowId = (a: Action) => `${a.plan.kind}:${a.plan.key}`;
@@ -179,7 +202,11 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 	const asked = Number(env.WINDOW_DAYS ?? cfg.immich.windowDays);
 	const reach = snap.since ? (now.getTime() - snap.since.getTime()) / (24 * 3_600_000) : asked;
 	const windowDays = scope === 'all' ? asked : Math.min(asked, reach);
-	const { plans, absorbed, folded } = plan(cfg, snap.assets, { now, windowDays, scope });
+	// A stacked photo is dropped before planning, so it counts for nothing, thresholds included.
+	if (cfg.stacks.primaryOnly && snap.stackError) throw new PreviewError(502, snap.stackError);
+	const stacked = cfg.stacks.primaryOnly ? snap.assets.filter((a) => a.stackChild).length : 0;
+	const assets = stacked ? snap.assets.filter((a) => !a.stackChild) : snap.assets;
+	const { plans, absorbed, folded } = plan(cfg, assets, { now, windowDays, scope });
 	const actions = reconcile(plans, snap.albums);
 	const windowStart = makeContext(cfg, now, windowDays, scope).windowStart;
 	// In window scope everything older than the window is unclaimed, and that is not news.
@@ -195,7 +222,7 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 	const rows = actions.map(rowOf);
 	const count = (op: PreviewRow['op']) => rows.filter((r) => r.op === op).length;
 	const gps = new Map<string, { lat: number; lon: number }>();
-	for (const a of snap.assets) {
+	for (const a of assets) {
 		if (a.lat !== null && a.lon !== null) gps.set(a.id, { lat: a.lat, lon: a.lon });
 	}
 	return {
@@ -213,8 +240,9 @@ function planWith(snapshot: Snapshot, cfg: Config, draft: boolean, scope: Scope)
 			token: tokenOf(rows),
 			draft,
 			stats: {
-				assets: snap.assets.length,
-				withGps: snap.assets.filter((a) => a.lat !== null).length,
+				assets: assets.length,
+				stacked,
+				withGps: assets.filter((a) => a.lat !== null).length,
 				people: snap.people,
 				absorbed: absorbed.size,
 				folded: folded.length,
@@ -265,6 +293,7 @@ export async function townsNear(lat: number, lon: number, km: number): Promise<T
 	const snap = await getSnapshot(reachOf(cfg, 'window', new Date()));
 	const towns = new Map<string, Town>();
 	for (const a of snap.assets) {
+		if (cfg.stacks.primaryOnly && a.stackChild) continue;
 		if (!a.city || a.lat === null || a.lon === null) continue;
 		if (haversineKm(a.lat, a.lon, lat, lon) > km) continue;
 		const t = towns.get(a.city) ?? { name: a.city, lat: a.lat, lon: a.lon, district: a.district ?? null, photos: 0 };

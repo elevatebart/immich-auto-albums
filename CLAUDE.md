@@ -22,6 +22,7 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - `src/immich.ts`: fetch client for the Immich REST API (`/api` prefix). `request()` and `authHeader()` are shared
   with `auth.ts`; a `Credential` is either an api key (`x-api-key`) or a session token (`Authorization: Bearer`).
   `attachDistricts` enriches assets with admin2 through the places endpoint and caches the hits per city.
+  `attachStacks` marks every asset a stack holds behind its primary, from one `GET /stacks`.
 - `src/auth.ts`: pure. Sign in with email and password, create the labelled child session, sweep leftovers, mint a
   scoped api key, and `verifyCredential` which probes one endpoint per permission the planner reads.
 - `src/env-file.ts`: writes `IMMICH_API_KEY` into the env file beside the config, atomically, only when asked.
@@ -78,6 +79,10 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
 - Nothing here deletes an album. `orphans(actions, albums, since?)` in `reconcile.ts` lists managed albums
   no plan claims any more, which the CLI logs and the server puts in `Preview.warnings`. Pass `since` in
   `window` scope, or every album older than the window is reported on every run.
+- `stacks.primary_only` drops every non-primary member of a stack before `plan()` is called, in the CLI and in
+  `planWith`, so a stacked shot counts for nothing, thresholds included. The planner never sees the flag. The server
+  fetches the stacks whatever the setting, so the form's checkbox replans off the snapshot instead of refetching;
+  when the fetch failed and the setting is on, the plan is refused rather than computed over the whole stack.
 - `person_years.favorites` is the allowlist for person albums. Empty means everyone over the threshold, which
   is the behaviour from before the key; `household` still only lowers the photo count, it does not grant an album.
 - In `window` scope a person year, season or fixed event is planned only when the window covers it in full, so a
@@ -107,8 +112,11 @@ person-years, seasonal buckets, fixed events) and reconciles them with existing 
   shown once), `GET /server/features` (unauthenticated, carries `passwordLogin` and `oauth`). Every endpoint above
   accepts `bearer` as well as `x-api-key`. There is no TOTP in Immich: the PIN and the elevated session gate locked
   assets only. Permissions needed, and the one list of them is `ALBUM_KEY_PERMISSIONS` in `src/auth.ts`:
-  asset.read, asset.view, person.read, album.read, album.create, album.update, albumAsset.create, albumAsset.delete,
-  user.read.
+  asset.read, asset.view, person.read, stack.read, album.read, album.create, album.update, albumAsset.create,
+  albumAsset.delete, user.read.
+  `GET /stacks` returns every stack with its `primaryAssetId` and full member assets, unpaginated. It is the only
+  source: `POST /search/metadata` never maps `stack`, and its `withStacked: false` drops whole stacks, primary
+  included, rather than hiding the members behind one.
 
 ## Code style
 - Comments and JSDoc at most 2 lines. No em dashes anywhere. Straight quotes.

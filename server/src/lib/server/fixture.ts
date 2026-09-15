@@ -49,6 +49,8 @@ export function fixtureAssets(now: Date, cfg: Config): Asset[] {
 		// Two day trips.
 		...burst(ago(60), 16, 1 / 3, (t) => mk(t, 45.76, 4.84, 'Lyon')),
 		...burst(ago(20), 18, 1 / 3, (t) => mk(t, 45.92, 6.87, 'Chamonix')),
+		// A burst Immich stacked behind one primary, which primary_only leaves out.
+		...burst(ago(20), 9, 1 / 60, (t) => ({ ...mk(t, 45.92, 6.87, 'Chamonix'), stackChild: true })),
 		// Party at the Grenoble home with three guests.
 		...burst(ago(90), 32, 1 / 12, (t) =>
 			mk(t, 45.19, 5.72, 'Grenoble', ['Alice Martin', 'Bob Roy', 'Cara Li'])

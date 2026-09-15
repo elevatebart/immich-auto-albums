@@ -6,6 +6,7 @@
 		Button,
 		Card,
 		CardBody,
+		Checkbox,
 		CardDescription,
 		CardHeader,
 		CardTitle,
@@ -167,7 +168,7 @@
 
 	<Card>
 		<CardHeader>
-			{@render heading('Immich', ['immich'])}
+			{@render heading('Immich', ['immich', 'stacks'])}
 			<CardDescription>
 				No credential is ever stored here: it comes from signing in, or from IMMICH_API_KEY.
 			</CardDescription>
@@ -202,6 +203,11 @@
 					{issues}
 					{diff}
 				/>
+				<ChangeFrame {diff} path="stacks.primaryOnly">
+					<Field label="Only the primary of a stack" description={hint('stacks.primaryOnly')}>
+						<Checkbox bind:checked={config.stacks.primaryOnly} aria-label="only the primary of a stack" />
+					</Field>
+				</ChangeFrame>
 			</Stack>
 		</CardBody>
 	</Card>

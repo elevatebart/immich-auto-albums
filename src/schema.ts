@@ -4,6 +4,7 @@ export const DAY_PATTERN = "^\\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\\d|3[01])$";
 const int = (minimum: number, maximum: number, description: string) => ({ type: "integer", minimum, maximum, description });
 const num = (minimum: number, maximum: number, description: string) => ({ type: "number", minimum, maximum, description });
 const text = (description: string) => ({ type: "string", minLength: 1, description });
+const bool = (description: string, dflt: boolean) => ({ type: "boolean", default: dflt, description });
 /** Both keywords on purpose: `format` needs ajv-formats, `pattern` works in any validator. */
 const day = (description: string) => ({ type: "string", format: "date", pattern: DAY_PATTERN, description });
 const obj = (properties: Record<string, unknown>, description?: string) => ({
@@ -28,6 +29,12 @@ export const configSchema = {
       windowDays: int(1, 3650, "Rolling window for trips, day trips and gatherings."),
       marker: text("Album description prefix. Only albums carrying it are ever touched."),
     }),
+    stacks: {
+      ...obj({
+        primaryOnly: bool("Only the primary photo of a stack joins an album. The other shots are ignored everywhere, thresholds included.", false),
+      }),
+      default: { primaryOnly: false },
+    },
     people: obj({
       me: text("Immich person name of the library owner."),
       household: { type: "array", items: text("Immich person name."), default: [], description: "Never named in a title, and eligible for a person year on a lower photo count." },

@@ -11,6 +11,7 @@ const day = (v: unknown): string => (v instanceof Date ? v.toISOString().slice(0
 export function fromToml(text: string): Config {
   const c = parse(text) as Raw;
   const im = c.immich ?? {};
+  const st = c.stacks ?? {};
   const pe = c.people ?? {};
   const cl = c.clustering ?? {};
   const py = c.person_years ?? {};
@@ -23,6 +24,7 @@ export function fromToml(text: string): Config {
       windowDays: im.window_days ?? 365,
       marker: im.marker ?? "[auto-albums]",
     },
+    stacks: { primaryOnly: st.primary_only ?? false },
     people: {
       me: pe.me,
       household: pe.household ?? [],
@@ -77,7 +79,7 @@ const list = (xs: string[]) => `[${xs.map(q).join(", ")}]`;
 /** Canonical config.toml for a Config. The comments are this template's, not the input file's. */
 export function toToml(c: Config): string {
   const out: string[] = [];
-  const row = (k: string, v: string | number, comment?: string) => {
+  const row = (k: string, v: string | number | boolean, comment?: string) => {
     const kv = `${k} = ${v}`;
     out.push(comment ? `${kv.padEnd(31)} # ${comment}` : kv);
   };
@@ -92,6 +94,9 @@ export function toToml(c: Config): string {
   row("out_dir", q(c.immich.outDir), "logs and decision CSVs");
   row("window_days", c.immich.windowDays, "rolling recompute window; WINDOW_DAYS env overrides");
   row("marker", q(c.immich.marker), "album description prefix; only tagged albums are ever touched");
+
+  head("[stacks]");
+  row("primary_only", c.stacks.primaryOnly, "only the primary photo of a stack joins an album");
 
   head("[people]");
   row("me", q(c.people.me));

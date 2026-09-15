@@ -16,12 +16,23 @@ The UI does not need any of this: it has a sign in form, and the session it open
 file sits in `/data`. Anything already in the environment wins over the file, so a one-off
 `WINDOW_DAYS=90 npm run preview` still works.
 
-Keys it understands: IMMICH_API_KEY, IMMICH_URL, CONFIG, OUT, WINDOW_DAYS, SCOPE, GEOCODER, ENV_FILE, and DEMO for
-the UI. A credential only ever lives in `.env` or in the environment, never in config.toml.
+Keys it understands: IMMICH_API_KEY, IMMICH_URL, CONFIG, OUT, WINDOW_DAYS, SCOPE, PRIMARY_ONLY, GEOCODER, ENV_FILE,
+and DEMO for the UI. A credential only ever lives in `.env` or in the environment, never in config.toml.
 
 By default a run only looks at the rolling window (`window_days`), and only fetches photos taken inside it. Person
 years, seasons and fixed events are planned only when the window covers them in full, so history is left alone. Pass
 `--all` (or `SCOPE=all`) for the whole library, which is what a first run wants.
+
+## Stacks
+
+A stack in Immich is one entry with a primary shot and the rest of the burst behind it. Set `primary_only = true`
+under `[stacks]` (the checkbox in the form, or `--primary-only` / `PRIMARY_ONLY=1` on the CLI) and only that primary
+joins an album. The other shots then count for nothing, thresholds included, so a burst-heavy day can drop under
+`daytrip_min_photos` and lose its album. The first apply after turning it on also takes those shots out of the albums
+already created, which removes them from the album and not from your library.
+
+Reading stacks needs the `stack.read` permission. A key minted before this option does not carry it, so run
+`npm run login` again, or add it to the key in Immich.
 
 UI: `cd server && DEMO=1 npm run dev` for the preview table, the apply confirm and the config form (see
 `server/README.md`). Without `DEMO=1` and without a key it opens on the sign in form.
